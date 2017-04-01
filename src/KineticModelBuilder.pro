@@ -43,67 +43,8 @@ SOURCES += main.cpp
 
 HEADERS += EigenLab.h
 
-#HEADERS += EigenHMM.h
-#SOURCES += EigenHMM.cpp
-
-#HEADERS += Object.h
-#SOURCES += Object.cpp
-
-#HEADERS += ObjectListPropertyTableView.h
-#SOURCES += ObjectListPropertyTableView.cpp
-
-#HEADERS += ObjectPropertyTableView.h
-#SOURCES += ObjectPropertyTableView.cpp
-
 HEADERS += ObjectPropertyTreeSerializer.h
 SOURCES += ObjectPropertyTreeSerializer.cpp
 
-#HEADERS += MarkovModel.h
-#SOURCES += MarkovModel.cpp
-
 HEADERS += MarkovModel.h
 SOURCES += MarkovModel.cpp
-
-#HEADERS += MarkovModelViewer.h
-#SOURCES += MarkovModelViewer.cpp
-
-#HEADERS += MarkovModelWindow.h
-#SOURCES += MarkovModelWindow.cpp
-
-#HEADERS += Random.h
-
-#HEADERS += StimulusClampProtocol.h
-#SOURCES += StimulusClampProtocol.cpp
-
-#HEADERS += StimulusClampProtocolPlot.h
-#SOURCES += StimulusClampProtocolPlot.cpp
-
-#HEADERS += StimulusClampProtocolSimulation.h
-#SOURCES += StimulusClampProtocolSimulation.cpp
-
-#HEADERS += StimulusClampProtocolWindow.h
-#SOURCES += StimulusClampProtocolWindow.cpp
-
-#HEADERS += StimulusClampProtocolSimulationDialog.h
-#SOURCES += StimulusClampProtocolSimulationDialog.cpp
-
-#HEADERS += StimulusClampProtocolOptimizationDialog.h
-#SOURCES += StimulusClampProtocolOptimizationDialog.cpp
-
-#HEADERS += Minimizer.h
-#SOURCES += Minimizer.cpp
-
-#HEADERS += MultipleIndexSpinBox.h
-#SOURCES += MultipleIndexSpinBox.cpp
-
-#HEADERS += Text3D.h
-#SOURCES += Text3D.cpp
-
-#HEADERS += Variable.h
-#SOURCES += Variable.cpp
-
-#HEADERS += WindowManager.h
-#SOURCES += WindowManager.cpp
-
-#HEADERS += test/test_ObjectListPropertyTableView.h
-#SOURCES += test/test_ObjectListPropertyTableView.cpp
