@@ -3,7 +3,7 @@
  * Email: marcel.goldschen@gmail.com
  * -------------------------------------------------------------------------------- */
 
-#include "ObjectPropertyTreeSerializer.h"
+#include "QObjectPropertyTreeSerializer.h"
 #include <stdexcept>
 #include <QFile>
 #include <QJsonDocument>
@@ -14,7 +14,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
-namespace ObjectPropertyTreeSerializer {
+namespace QObjectPropertyTreeSerializer {
 
 QVariantMap serialize(const QObject *object, int childDepth, bool includeReadOnlyProperties, bool includeObjectName)
 {
@@ -205,4 +205,4 @@ bool writeJson(QObject *object, const QString &filePath)
     return true;
 }
 
-} // ObjectPropertyTreeSerializer
+} // QObjectPropertyTreeSerializer

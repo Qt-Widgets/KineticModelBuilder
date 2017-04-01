@@ -34,7 +34,7 @@
 #else
 #include "EigenLab.h"
 #endif
-#include "ObjectPropertyTreeSerializer.h"
+#include "QObjectPropertyTreeSerializer.h"
 #ifdef DEBUG
 #include <iostream>
 #include <QDebug>
@@ -479,7 +479,7 @@ private:
 #endif
 
     // Dynamic object creation.
-    ObjectPropertyTreeSerializer::ObjectFactory _factory;
+    QObjectPropertyTreeSerializer::ObjectFactory _factory;
     template <class T>
     static QObject* _createObject() { return new T(); }
 };

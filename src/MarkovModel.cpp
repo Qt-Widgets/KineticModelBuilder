@@ -568,7 +568,7 @@ void MarkovModel::setFreeVariables(const std::vector<double> &values)
 #ifdef DEBUG
 void MarkovModel::dump(std::ostream &out)
 {
-    QVariantMap data = ObjectPropertyTreeSerializer::serialize(this, 1, true, false);
+    QVariantMap data = QObjectPropertyTreeSerializer::serialize(this, 1, true, false);
     out << QJsonDocument::fromVariant(data).toJson(QJsonDocument::Indented).toStdString();
 #ifdef USE_EXPR_TK
 #else

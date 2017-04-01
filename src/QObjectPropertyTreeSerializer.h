@@ -7,8 +7,8 @@
  * Email: marcel.goldschen@gmail.com
  * -------------------------------------------------------------------------------- */
 
-#ifndef __ObjectPropertyTreeSerializer_H__
-#define __ObjectPropertyTreeSerializer_H__
+#ifndef __QObjectPropertyTreeSerializer_H__
+#define __QObjectPropertyTreeSerializer_H__
 
 #include <QByteArray>
 #include <QMap>
@@ -20,7 +20,7 @@
 #include <QDebug>
 #endif
 
-namespace ObjectPropertyTreeSerializer {
+namespace QObjectPropertyTreeSerializer {
 
 /* --------------------------------------------------------------------------------
  * Object factory for dynamic object creation during deserialization.
@@ -58,6 +58,6 @@ void addMappedData(QVariantMap &data, const QByteArray &key, const QVariant &val
 bool readJson(QObject *object, const QString &filePath, ObjectFactory *factory = 0);
 bool writeJson(QObject *object, const QString &filePath);
 
-} // ObjectPropertyTreeSerializer
+} // QObjectPropertyTreeSerializer
 
 #endif
