@@ -3,6 +3,8 @@
 .DS_Store
 *.xcodeproj/
 *.build/
+Debug/
+Release/
 Info.plist
 
 # C++ objects and libs
