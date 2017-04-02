@@ -1,9 +1,11 @@
 # MacOSX
-.DS_Store
 
-# Build dirs.
-build*/
-src/build*/
+.DS_Store
+*.xcodeproj/
+src/*.xcodeproj/
+*.build/
+src/*.build/
+Info.plist
 
 # C++ objects and libs
 
