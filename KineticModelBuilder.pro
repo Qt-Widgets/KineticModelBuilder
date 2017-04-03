@@ -24,7 +24,7 @@ QMAKE_CFLAGS += -O3
 QMAKE_CXXFLAGS += -march=native
 
 # Qwt
-include(/usr/local/Cellar/qwt/6.1.2/features/qwt.prf)
+include(/usr/local/Cellar/qwt/6.1.3_3/features/qwt.prf)
 CONFIG += qwt
 
 # Eigen
@@ -38,8 +38,10 @@ LIBS += -L/usr/local/Cellar/gsl/1.16/lib -lgsl -lgslcblas
 HEADERS += EigenLab.h
 #HEADERS += exprtk.hpp
 HEADERS += MarkovModel.h
+HEADERS += QObjectPropertyEditor.h
 HEADERS += QObjectPropertyTreeSerializer.h
 
 SOURCES += main.cpp
 SOURCES += MarkovModel.cpp
+SOURCES += QObjectPropertyEditor.cpp
 SOURCES += QObjectPropertyTreeSerializer.cpp
