@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 //    MarkovModel::test();
 //    return 0;
     
-    return QObjectPropertyEditor::testQObjectPropertyEditor(argc, argv);
+    return QObjectPropertyEditor::testQObjectListPropertyEditor(argc, argv);
 
 //    QApplication app(argc, argv);
 //    int status = app.exec();

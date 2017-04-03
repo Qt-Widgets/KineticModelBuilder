@@ -27,6 +27,9 @@
 
 namespace QObjectPropertyEditor {
     
+    // Handle descendant properties such as "child.grandchild.property".
+    QObject* descendant(QObject *object, const QByteArray &pathToDescendantObject);
+    
     /* --------------------------------------------------------------------------------
      * Things that all QObject property models should be able to do.
      * -------------------------------------------------------------------------------- */
@@ -39,7 +42,10 @@ namespace QObjectPropertyEditor {
         
         virtual QObject* objectAtIndex(const QModelIndex &index) const = 0;
         virtual QByteArray propertyNameAtIndex(const QModelIndex &index) const = 0;
-        virtual const QMetaProperty metaPropertyAtIndex(const QModelIndex &index) const = 0;
+        const QMetaProperty metaPropertyAtIndex(const QModelIndex &index) const;
+        QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
+        bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
+        Qt::ItemFlags flags(const QModelIndex &index) const;
     };
     
     /* --------------------------------------------------------------------------------
@@ -62,26 +68,52 @@ namespace QObjectPropertyEditor {
         void setPropertyNames(const QList<QByteArray> &names) { _propertyNames = names; }
         void setPropertyHeaders(const QHash<QByteArray, QString> &headers) { _propertyHeaders = headers; }
         
-        // Index info.
+        // Model interface.
         QObject* objectAtIndex(const QModelIndex &index) const;
         QByteArray propertyNameAtIndex(const QModelIndex &index) const;
-        const QMetaProperty metaPropertyAtIndex(const QModelIndex &index) const;
-        
-        // Tree model interface.
         QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
         QModelIndex parent(const QModelIndex &index) const;
         int rowCount(const QModelIndex &parent = QModelIndex()) const;
         int columnCount(const QModelIndex &parent = QModelIndex()) const;
-        QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const;
-        bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole);
-        Qt::ItemFlags flags(const QModelIndex &index) const;
         QVariant headerData(int section, Qt::Orientation orientation, int role) const;
-        
-        // Handle descendant properties such as "child.grandchild.property".
-        static QObject* descendant(QObject *object, const QByteArray &pathToDescendantObject);
         
     protected:
         QObject *_object;
+        QList<QByteArray> _propertyNames;
+        QHash<QByteArray, QString> _propertyHeaders;
+    };
+    
+    /* --------------------------------------------------------------------------------
+     * Property model for a list of QObjects (same properties for each).
+     * -------------------------------------------------------------------------------- */
+    class QObjectListPropertyModel : public QAbstractPropertyModel
+    {
+        Q_OBJECT
+        
+    public:
+        QObjectListPropertyModel(QObject *parent = 0) : QAbstractPropertyModel(parent) {}
+        
+        // Property getters.
+        QObjectList objects() const { return _objects; }
+        QList<QByteArray> propertyNames() const { return _propertyNames; }
+        QHash<QByteArray, QString> propertyHeaders() const { return _propertyHeaders; }
+        
+        // Property setters. !!! Remember to call beginResetModel() and endResetModel() around your model changes.
+        void setObjects(const QObjectList &objects) { _objects = objects; }
+        void setPropertyNames(const QList<QByteArray> &names) { _propertyNames = names; }
+        void setPropertyHeaders(const QHash<QByteArray, QString> &headers) { _propertyHeaders = headers; }
+        
+        // Model interface.
+        QObject* objectAtIndex(const QModelIndex &index) const;
+        QByteArray propertyNameAtIndex(const QModelIndex &index) const;
+        QModelIndex index(int row, int column, const QModelIndex &parent = QModelIndex()) const;
+        QModelIndex parent(const QModelIndex &index) const;
+        int rowCount(const QModelIndex &parent = QModelIndex()) const;
+        int columnCount(const QModelIndex &parent = QModelIndex()) const;
+        QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+        
+    protected:
+        QObjectList _objects;
         QList<QByteArray> _propertyNames;
         QHash<QByteArray, QString> _propertyHeaders;
     };
@@ -114,6 +146,20 @@ namespace QObjectPropertyEditor {
     public:
         QObjectPropertyEditor(QWidget *parent = 0);
     
+    protected:
+        QObjectPropertyDelegate _delegate;
+    };
+    
+    /* --------------------------------------------------------------------------------
+     * Editor for properties in a list of QObjects.
+     * -------------------------------------------------------------------------------- */
+    class QObjectListPropertyEditor : public QTableView
+    {
+        Q_OBJECT
+        
+    public:
+        QObjectListPropertyEditor(QWidget *parent = 0);
+        
     protected:
         QObjectPropertyDelegate _delegate;
     };
@@ -152,7 +198,7 @@ namespace QObjectPropertyEditor {
         Q_ENUMS(MyEnum)
         
         // Init.
-        TestObject(QObject *parent = 0) :
+        TestObject(const QString &name = "", QObject *parent = 0) :
         QObject(parent),
         _myEnum(B),
         _myBool(true),
@@ -167,7 +213,9 @@ namespace QObjectPropertyEditor {
         _myPointF(0.05, 1.03),
         _myRect(0, 0, 3, 3),
         _myRectF(0.5, 0.5, 1.3, 3.1)
-        {}
+        {
+            setObjectName(name);
+        }
         
         // Property getters.
         MyEnum myEnum() const { return _myEnum; }
@@ -216,6 +264,7 @@ namespace QObjectPropertyEditor {
     };
     
     int testQObjectPropertyEditor(int argc, char **argv);
+    int testQObjectListPropertyEditor(int argc, char **argv);
 #endif
     
 } // QObjectPropertyEditor
