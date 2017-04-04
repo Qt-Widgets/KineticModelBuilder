@@ -271,6 +271,67 @@ namespace QObjectPropertyEditor {
         }
         return QVariant();
     }
+    
+    bool QObjectListPropertyModel::insertRows(int row, int count, const QModelIndex &parent)
+    {
+        // Only valid if we have an object creator method.
+        if(!_objectCreator)
+            return false;
+        beginInsertRows(parent, row, row + count - 1);
+        for(int i = row; i < row + count; ++i) {
+            QObject *object = (*_objectCreator)();
+            if(_parentOfObjects)
+                object->setParent(_parentOfObjects);
+            _objects.insert(i, object);
+        }
+        endInsertRows();
+        reorderChildObjectsToMatchRowOrder(row + count);
+        return true;
+    }
+    
+    bool QObjectListPropertyModel::removeRows(int row, int count, const QModelIndex &parent)
+    {
+        beginRemoveRows(parent, row, row + count - 1);
+        for(int i = row; i < row + count; ++i)
+            delete _objects.at(i);
+        QObjectList::iterator begin = _objects.begin() + row;
+        _objects.erase(begin, begin + count);
+        endRemoveRows();
+        return true;
+    }
+    
+    bool QObjectListPropertyModel::moveRows(const QModelIndex &/*sourceParent*/, int sourceRow, int count, const QModelIndex &/*destinationParent*/, int destinationRow)
+    {
+        beginResetModel();
+        QObjectList objectsToMove;
+        for(int i = sourceRow; i < sourceRow + count; ++i)
+            objectsToMove.append(_objects.takeAt(sourceRow));
+        for(int i = 0; i < objectsToMove.size(); ++i) {
+            if(destinationRow + i >= _objects.size())
+                _objects.append(objectsToMove.at(i));
+            else
+                _objects.insert(destinationRow + i, objectsToMove.at(i));
+        }
+        endResetModel();
+        reorderChildObjectsToMatchRowOrder(sourceRow <= destinationRow ? sourceRow : destinationRow);
+        return true;
+    }
+    
+    void QObjectListPropertyModel::reorderChildObjectsToMatchRowOrder(int firstRow)
+    {
+        beginResetModel();
+        for(int i = firstRow; i < rowCount(); ++i) {
+            QObject *object = objectAtIndex(createIndex(i, 0));
+            if(object) {
+                QObject *parent = object->parent();
+                if(parent) {
+                    object->setParent(0);
+                    object->setParent(parent);
+                }
+            }
+        }
+        endResetModel();
+    }
 
     QWidget* QObjectPropertyDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
     {
@@ -290,7 +351,6 @@ namespace QObjectPropertyEditor {
                 // We don't need to do anything special for an integer, we'll just use the default QSpinBox.
                 // However, we do need to check if it is an enum. If so, we'll use a QComboBox editor.
                 const QAbstractPropertyModel *propertyModel = qobject_cast<const QAbstractPropertyModel*>(index.model());
-                qDebug() << propertyModel;
                 if(propertyModel) {
                     const QMetaProperty metaProperty = propertyModel->metaPropertyAtIndex(index);
                     if(metaProperty.isValid() && metaProperty.isEnumType()) {
@@ -625,6 +685,45 @@ namespace QObjectPropertyEditor {
         setItemDelegate(&_delegate);
         setAlternatingRowColors(true);
         verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+        verticalHeader()->setSectionsMovable(true);
+        connect(verticalHeader(), SIGNAL(sectionMoved(int, int, int)), this, SLOT(handleSectionMove(int, int, int)));
+    }
+    
+    void QObjectListPropertyEditor::insertSelectedRows()
+    {
+        QModelIndexList indexes = selectionModel()->selectedRows();
+        if(indexes.size()) {
+            QList<int> rows;
+            foreach(const QModelIndex &index, indexes)
+                rows.append(index.row());
+            qSort(rows);
+            model()->insertRows(rows.at(0), rows.size());
+        } else {
+            // If no rows are selected, append a row.
+            model()->insertRows(model()->rowCount(), 1);
+        }
+    }
+    
+    void QObjectListPropertyEditor::removeSelectedRows()
+    {
+        QModelIndexList indexes = selectionModel()->selectedRows();
+        QList<int> rows;
+        foreach(const QModelIndex &index, indexes)
+            rows.append(index.row());
+        qSort(rows);
+        for(int i = rows.size() - 1; i >= 0; --i)
+            model()->removeRows(rows.at(i), 1);
+    }
+    
+    void QObjectListPropertyEditor::handleSectionMove(int /* logicalIndex */, int oldVisualIndex, int newVisualIndex)
+    {
+        if(QObjectListPropertyModel *propertyModel = qobject_cast<QObjectListPropertyModel*>(model())) {
+            // Move objects in the model, and then move the sections back to maintain logicalIndex order.
+            propertyModel->moveRows(QModelIndex(), oldVisualIndex, 1, QModelIndex(), newVisualIndex);
+            disconnect(verticalHeader(), SIGNAL(sectionMoved(int, int, int)), this, SLOT(handleSectionMove(int, int, int)));
+            verticalHeader()->moveSection(newVisualIndex, oldVisualIndex);
+            connect(verticalHeader(), SIGNAL(sectionMoved(int, int, int)), this, SLOT(handleSectionMove(int, int, int)));
+        }
     }
     
 #ifdef DEBUG
@@ -667,9 +766,10 @@ namespace QObjectPropertyEditor {
         QApplication app(argc, argv);
         
         // Objects.
+        QObject parent;
         QObjectList objects;
         for(int i = 0; i < 5; ++i) {
-            QObject *object = new TestObject("My Obj " + QString::number(i));
+            QObject *object = new TestObject("My Obj " + QString::number(i), &parent);
             // Dynamic properties.
             object->setProperty("myDynamicBool", false);
             object->setProperty("myDynamicInt", 3);
@@ -682,6 +782,7 @@ namespace QObjectPropertyEditor {
         // Model.
         QObjectListPropertyModel model;
         model.setObjects(objects);
+        model.setParentOfObjects(&parent);
         
         // Property headers.
         QHash<QByteArray, QString> propertyHeaders;
@@ -695,7 +796,11 @@ namespace QObjectPropertyEditor {
         editor.resizeColumnsToContents();
         
         int status = app.exec();
-        qDeleteAll(objects);
+        
+        // Check child object order.
+        foreach(QObject *object, parent.findChildren<QObject*>())
+            qDebug() << object->objectName();
+        
         return status;
     }
 #endif

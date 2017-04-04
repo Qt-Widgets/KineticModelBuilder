@@ -91,17 +91,23 @@ namespace QObjectPropertyEditor {
         Q_OBJECT
         
     public:
-        QObjectListPropertyModel(QObject *parent = 0) : QAbstractPropertyModel(parent) {}
+        typedef QObject* (*ObjectCreatorFuncPtr)();
+        
+        QObjectListPropertyModel(QObject *parent = 0) : QAbstractPropertyModel(parent), _parentOfObjects(0), _objectCreator(0) {}
         
         // Property getters.
         QObjectList objects() const { return _objects; }
         QList<QByteArray> propertyNames() const { return _propertyNames; }
         QHash<QByteArray, QString> propertyHeaders() const { return _propertyHeaders; }
+        QObject* parentOfObjects() const { return _parentOfObjects; }
+        ObjectCreatorFuncPtr objectCreator() const { return _objectCreator; }
         
         // Property setters. !!! Remember to call beginResetModel() and endResetModel() around your model changes.
         void setObjects(const QObjectList &objects) { _objects = objects; }
         void setPropertyNames(const QList<QByteArray> &names) { _propertyNames = names; }
         void setPropertyHeaders(const QHash<QByteArray, QString> &headers) { _propertyHeaders = headers; }
+        void setParentOfObjects(QObject *parent) { _parentOfObjects = parent; }
+        void setObjectCreator(ObjectCreatorFuncPtr creator) { _objectCreator = creator; }
         
         // Model interface.
         QObject* objectAtIndex(const QModelIndex &index) const;
@@ -111,11 +117,17 @@ namespace QObjectPropertyEditor {
         int rowCount(const QModelIndex &parent = QModelIndex()) const;
         int columnCount(const QModelIndex &parent = QModelIndex()) const;
         QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+        bool insertRows(int row, int count, const QModelIndex &parent = QModelIndex());
+        bool removeRows(int row, int count, const QModelIndex &parent = QModelIndex());
+        bool moveRows(const QModelIndex &sourceParent, int sourceRow, int count, const QModelIndex &destinationParent, int destinationRow);
+        void reorderChildObjectsToMatchRowOrder(int firstRow = 0);
         
     protected:
         QObjectList _objects;
         QList<QByteArray> _propertyNames;
         QHash<QByteArray, QString> _propertyHeaders;
+        QObject *_parentOfObjects;
+        ObjectCreatorFuncPtr _objectCreator;
     };
     
     /* --------------------------------------------------------------------------------
@@ -159,6 +171,11 @@ namespace QObjectPropertyEditor {
         
     public:
         QObjectListPropertyEditor(QWidget *parent = 0);
+        
+    public slots:
+        void insertSelectedRows();
+        void removeSelectedRows();
+        void handleSectionMove(int logicalIndex, int oldVisualIndex, int newVisualIndex);
         
     protected:
         QObjectPropertyDelegate _delegate;

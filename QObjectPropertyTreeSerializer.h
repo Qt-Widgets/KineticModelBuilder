@@ -40,9 +40,6 @@ private:
     ObjectCreatorMap _objectCreatorMap;
 };
 
-// Used to specify access type to include in serialization.
-enum AccessType { READ_AND_WRITE, READ_ONLY, WRITE_ONLY };
-
 /* --------------------------------------------------------------------------------
  * Serialize/Deserialize to/from a QVariantMap.
  * -------------------------------------------------------------------------------- */
