@@ -9,6 +9,7 @@
 #include <QEvent>
 #include <QHeaderView>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMetaObject>
 #include <QMouseEvent>
 #include <QRegularExpression>
@@ -685,28 +686,62 @@ namespace QObjectPropertyEditor {
         setItemDelegate(&_delegate);
         setAlternatingRowColors(true);
         verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+        
+        // Draggable rows.
         verticalHeader()->setSectionsMovable(true);
         connect(verticalHeader(), SIGNAL(sectionMoved(int, int, int)), this, SLOT(handleSectionMove(int, int, int)));
+        
+        // Header context menus.
+        horizontalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
+        verticalHeader()->setContextMenuPolicy(Qt::CustomContextMenu);
+        connect(horizontalHeader(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(horizontalHeaderContextMenu(QPoint)));
+        connect(verticalHeader(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(verticalHeaderContextMenu(QPoint)));
+    }
+    
+    void QObjectListPropertyEditor::horizontalHeaderContextMenu(QPoint pos)
+    {
+        QModelIndexList indexes = selectionModel()->selectedColumns();
+        QMenu *menu = new QMenu;
+        menu->addAction("Resize Columns To Contents", this, SLOT(resizeColumnsToContents()));
+        menu->popup(horizontalHeader()->viewport()->mapToGlobal(pos));
+    }
+    
+    void QObjectListPropertyEditor::verticalHeaderContextMenu(QPoint pos)
+    {
+        QModelIndexList indexes = selectionModel()->selectedRows();
+        QMenu *menu = new QMenu;
+        menu->addAction("Append Row", this, SLOT(appendRow()));
+        if(indexes.size()) {
+            menu->addSeparator();
+            menu->addAction("Insert Rows", this, SLOT(insertSelectedRows()));
+            menu->addSeparator();
+            menu->addAction("Delete Rows", this, SLOT(removeSelectedRows()));
+        }
+        menu->popup(verticalHeader()->viewport()->mapToGlobal(pos));
+    }
+    
+    void QObjectListPropertyEditor::appendRow()
+    {
+        model()->insertRows(model()->rowCount(), 1);
     }
     
     void QObjectListPropertyEditor::insertSelectedRows()
     {
         QModelIndexList indexes = selectionModel()->selectedRows();
-        if(indexes.size()) {
-            QList<int> rows;
-            foreach(const QModelIndex &index, indexes)
-                rows.append(index.row());
-            qSort(rows);
-            model()->insertRows(rows.at(0), rows.size());
-        } else {
-            // If no rows are selected, append a row.
-            model()->insertRows(model()->rowCount(), 1);
-        }
+        if(indexes.size() == 0)
+            return;
+        QList<int> rows;
+        foreach(const QModelIndex &index, indexes)
+            rows.append(index.row());
+        qSort(rows);
+        model()->insertRows(rows.at(0), rows.size());
     }
     
     void QObjectListPropertyEditor::removeSelectedRows()
     {
         QModelIndexList indexes = selectionModel()->selectedRows();
+        if(indexes.size() == 0)
+            return;
         QList<int> rows;
         foreach(const QModelIndex &index, indexes)
             rows.append(index.row());
@@ -760,6 +795,8 @@ namespace QObjectPropertyEditor {
         return app.exec();
     }
     
+    QObject* newTestObject() { return new TestObject(); }
+    
     int testQObjectListPropertyEditor(int argc, char **argv)
     {
         
@@ -783,6 +820,7 @@ namespace QObjectPropertyEditor {
         QObjectListPropertyModel model;
         model.setObjects(objects);
         model.setParentOfObjects(&parent);
+        model.setObjectCreator(newTestObject);
         
         // Property headers.
         QHash<QByteArray, QString> propertyHeaders;

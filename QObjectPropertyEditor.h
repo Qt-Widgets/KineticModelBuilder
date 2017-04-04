@@ -173,6 +173,9 @@ namespace QObjectPropertyEditor {
         QObjectListPropertyEditor(QWidget *parent = 0);
         
     public slots:
+        void horizontalHeaderContextMenu(QPoint pos);
+        void verticalHeaderContextMenu(QPoint pos);
+        void appendRow();
         void insertSelectedRows();
         void removeSelectedRows();
         void handleSectionMove(int logicalIndex, int oldVisualIndex, int newVisualIndex);
