@@ -761,6 +761,12 @@ namespace QObjectPropertyEditor {
         }
     }
     
+    void QObjectListPropertyEditor::keyPressEvent(QKeyEvent *event)
+    {
+        if(event->key() == Qt::Key_Plus)
+            appendRow();
+    }
+    
 #ifdef DEBUG
     int testQObjectPropertyEditor(int argc, char **argv)
     {

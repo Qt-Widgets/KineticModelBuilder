@@ -182,6 +182,8 @@ namespace QObjectPropertyEditor {
         
     protected:
         QObjectPropertyDelegate _delegate;
+        
+        void keyPressEvent(QKeyEvent *event);
     };
     
 #ifdef DEBUG
