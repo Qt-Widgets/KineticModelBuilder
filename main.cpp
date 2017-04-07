@@ -1,6 +1,6 @@
 #include <QApplication>
 #include "MarkovModel.h"
-#include "QObjectPropertyEditor.h"
+#include "MarkovModelViewer.h"
 #ifdef DEBUG
 #include <iostream>
 #include <QDebug>
@@ -10,10 +10,12 @@ int main(int argc, char **argv)
 {
 //    MarkovModel::test();
 //    return 0;
-    
-    return QObjectPropertyEditor::testQObjectListPropertyEditor(argc, argv);
 
-//    QApplication app(argc, argv);
-//    int status = app.exec();
-//    return status;
+    QApplication app(argc, argv);
+    MarkovModel::MarkovModel model;
+    MarkovModel::MarkovModelViewer viewer;
+    viewer.setModel(&model);
+    viewer.show();
+    int status = app.exec();
+    return status;
 }

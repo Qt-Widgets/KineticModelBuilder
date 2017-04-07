@@ -20,41 +20,45 @@
 #include <QDebug>
 #endif
 
-namespace QObjectPropertyTreeSerializer {
-
-/* --------------------------------------------------------------------------------
- * Object factory for dynamic object creation during deserialization.
- * -------------------------------------------------------------------------------- */
-class ObjectFactory
+namespace QObjectPropertyTreeSerializer
 {
-public:
-    typedef QObject* (*ObjectCreatorFuncPtr)();
-    typedef QMap<QByteArray, ObjectCreatorFuncPtr> ObjectCreatorMap;
-
-public:
-    bool hasCreator(const QByteArray &className) const { return _objectCreatorMap.contains(className); }
-    void registerCreator(const QByteArray &className, ObjectCreatorFuncPtr creator) { _objectCreatorMap[className] = creator; }
-    QObject* create(const QByteArray &className) const { return _objectCreatorMap.contains(className) ? (*_objectCreatorMap.value(className))() : 0; }
-
-private:
-    ObjectCreatorMap _objectCreatorMap;
-};
-
-/* --------------------------------------------------------------------------------
- * Serialize/Deserialize to/from a QVariantMap.
- * -------------------------------------------------------------------------------- */
-QVariantMap serialize(const QObject *object, int childDepth = -1, bool includeReadOnlyProperties = true, bool includeObjectName = true);
-void deserialize(QObject *object, const QVariantMap &data, ObjectFactory *factory = 0);
-
-// Helper function used by serialize() and deserialize().
-void addMappedData(QVariantMap &data, const QByteArray &key, const QVariant &value);
-
-/* --------------------------------------------------------------------------------
- * Read/Write from/to JSON.
- * -------------------------------------------------------------------------------- */
-bool readJson(QObject *object, const QString &filePath, ObjectFactory *factory = 0);
-bool writeJson(QObject *object, const QString &filePath);
-
+    /* --------------------------------------------------------------------------------
+     * Object factory for dynamic object creation during deserialization.
+     * -------------------------------------------------------------------------------- */
+    class ObjectFactory
+    {
+    public:
+        typedef QObject* (*ObjectCreatorFuncPtr)();
+        typedef QMap<QByteArray, ObjectCreatorFuncPtr> ObjectCreatorMap;
+        
+    public:
+        void registerCreator(const QByteArray &className, ObjectCreatorFuncPtr creator) { _objectCreatorMap[className] = creator; }
+        ObjectCreatorFuncPtr creator(const QByteArray &className) const { return _objectCreatorMap.contains(className) ? _objectCreatorMap.value(className) : 0; }
+        QObject* create(const QByteArray &className) const { return _objectCreatorMap.contains(className) ? (*_objectCreatorMap.value(className))() : 0; }
+        
+        // For convenience. e.g. call ObjectFactory::registerCreator("MyClass", ObjectFactory::defaultCreator<MyClass>);
+        template <class T>
+        static QObject* defaultCreator() { return new T(); }
+        
+    private:
+        ObjectCreatorMap _objectCreatorMap;
+    };
+    
+    /* --------------------------------------------------------------------------------
+     * Serialize/Deserialize to/from a QVariantMap.
+     * -------------------------------------------------------------------------------- */
+    QVariantMap serialize(const QObject *object, int childDepth = -1, bool includeReadOnlyProperties = true, bool includeObjectName = true);
+    void deserialize(QObject *object, const QVariantMap &data, ObjectFactory *factory = 0);
+    
+    // Helper function used by serialize() and deserialize().
+    void addMappedData(QVariantMap &data, const QByteArray &key, const QVariant &value);
+    
+    /* --------------------------------------------------------------------------------
+     * Read/Write from/to JSON.
+     * -------------------------------------------------------------------------------- */
+    bool readJson(QObject *object, const QString &filePath, ObjectFactory *factory = 0);
+    bool writeJson(QObject *object, const QString &filePath);
+    
 } // QObjectPropertyTreeSerializer
 
 #endif

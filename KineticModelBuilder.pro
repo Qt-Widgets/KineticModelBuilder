@@ -1,6 +1,6 @@
 TARGET = KineticModelBuilder
 TEMPLATE = app
-QT += core widgets opengl xml concurrent svg
+QT += core gui widgets opengl xml concurrent svg
 
 # MACX application bundle
 macx: CONFIG += app_bundle
@@ -23,6 +23,10 @@ win64: DEFINES += WIN64
 QMAKE_CFLAGS += -O3
 QMAKE_CXXFLAGS += -march=native
 
+# GLU
+#INCLUDEPATH += /usr/X11/include
+#LIBS += -L/usr/X11/lib -lGLU
+
 # Qwt
 include(/usr/local/Cellar/qwt/6.1.3_3/features/qwt.prf)
 CONFIG += qwt
@@ -35,13 +39,19 @@ INCLUDEPATH += /usr/local/Cellar/gsl/1.16/include
 LIBS += -L/usr/local/Cellar/gsl/1.16/lib -lgsl -lgslcblas
 
 # Files
-HEADERS += EigenLab.h
-#HEADERS += exprtk.hpp
-HEADERS += MarkovModel.h
-HEADERS += QObjectPropertyEditor.h
-HEADERS += QObjectPropertyTreeSerializer.h
+HEADERS += \
+EigenLab.h \
+MarkovModel.h \
+MarkovModelPropertyEditor.h \
+MarkovModelViewer.h \
+QFont3D.h \
+QObjectPropertyEditor.h \
+QObjectPropertyTreeSerializer.h
 
-SOURCES += main.cpp
-SOURCES += MarkovModel.cpp
-SOURCES += QObjectPropertyEditor.cpp
-SOURCES += QObjectPropertyTreeSerializer.cpp
+SOURCES += main.cpp \
+MarkovModel.cpp \
+MarkovModelPropertyEditor.cpp \
+MarkovModelViewer.cpp \
+QFont3D.cpp \
+QObjectPropertyEditor.cpp \
+QObjectPropertyTreeSerializer.cpp

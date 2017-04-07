@@ -25,7 +25,12 @@
 #include <QDateTime>
 #endif
 
-namespace QObjectPropertyEditor {
+namespace QObjectPropertyEditor
+{
+    // List all object property names.
+    QList<QByteArray> getObjectPropertyNames(QObject *object);
+    QList<QByteArray> getMetaObjectPropertyNames(const QMetaObject &metaObject);
+    //QList<QByteArray> getMetaObjectPropertyNames(const QMetaObject *metaObject) { return getMetaObjectPropertyNames(*metaObject); }
     
     // Handle descendant properties such as "child.grandchild.property".
     QObject* descendant(QObject *object, const QByteArray &pathToDescendantObject);
@@ -63,10 +68,10 @@ namespace QObjectPropertyEditor {
         QList<QByteArray> propertyNames() const { return _propertyNames; }
         QHash<QByteArray, QString> propertyHeaders() const { return _propertyHeaders; }
         
-        // Property setters. !!! Remember to call beginResetModel() and endResetModel() around your model changes.
-        void setObject(QObject *obj) { _object = obj; }
-        void setPropertyNames(const QList<QByteArray> &names) { _propertyNames = names; }
-        void setPropertyHeaders(const QHash<QByteArray, QString> &headers) { _propertyHeaders = headers; }
+        // Property setters.
+        void setObject(QObject *obj) { beginResetModel(); _object = obj; endResetModel(); }
+        void setPropertyNames(const QList<QByteArray> &names) { beginResetModel(); _propertyNames = names; endResetModel(); }
+        void setPropertyHeaders(const QHash<QByteArray, QString> &headers) { beginResetModel(); _propertyHeaders = headers; endResetModel(); }
         
         // Model interface.
         QObject* objectAtIndex(const QModelIndex &index) const;
@@ -102,12 +107,16 @@ namespace QObjectPropertyEditor {
         QObject* parentOfObjects() const { return _parentOfObjects; }
         ObjectCreatorFuncPtr objectCreator() const { return _objectCreator; }
         
-        // Property setters. !!! Remember to call beginResetModel() and endResetModel() around your model changes.
-        void setObjects(const QObjectList &objects) { _objects = objects; }
-        void setPropertyNames(const QList<QByteArray> &names) { _propertyNames = names; }
-        void setPropertyHeaders(const QHash<QByteArray, QString> &headers) { _propertyHeaders = headers; }
+        // Property setters.
+        void setObjects(const QObjectList &objects) { beginResetModel(); _objects = objects; endResetModel(); }
+        template <class T>
+        void setObjects(const QList<T*> &objects);
+        void setPropertyNames(const QList<QByteArray> &names) { beginResetModel(); _propertyNames = names; endResetModel(); }
+        void setPropertyHeaders(const QHash<QByteArray, QString> &headers) { beginResetModel(); _propertyHeaders = headers; endResetModel(); }
         void setParentOfObjects(QObject *parent) { _parentOfObjects = parent; }
         void setObjectCreator(ObjectCreatorFuncPtr creator) { _objectCreator = creator; }
+        template <class T>
+        static QObject* defaultCreator() { return new T(); }
         
         // Model interface.
         QObject* objectAtIndex(const QModelIndex &index) const;
@@ -129,6 +138,18 @@ namespace QObjectPropertyEditor {
         QObject *_parentOfObjects;
         ObjectCreatorFuncPtr _objectCreator;
     };
+    
+    template <class T>
+    void QObjectListPropertyModel::setObjects(const QList<T*> &objects)
+    {
+        beginResetModel();
+        _objects.clear();
+        foreach(T *object, objects) {
+            if(QObject *obj = qobject_cast<QObject*>(object))
+                _objects.append(obj);
+        }
+        endResetModel();
+    }
     
     /* --------------------------------------------------------------------------------
      * Property editor delegate.
@@ -285,6 +306,16 @@ namespace QObjectPropertyEditor {
         QRectF _myRectF;
     };
     
+    /* --------------------------------------------------------------------------------
+     * Unit tests.
+     * 
+     * Example main.cpp:
+     *
+     * #include "QObjectPropertyEditor"
+     * int main(int argc, char **argv) {
+     *   return QObjectPropertyEditor::testQObjectListPropertyEditor(argc, argv);
+     * }
+     * -------------------------------------------------------------------------------- */
     int testQObjectPropertyEditor(int argc, char **argv);
     int testQObjectListPropertyEditor(int argc, char **argv);
 #endif

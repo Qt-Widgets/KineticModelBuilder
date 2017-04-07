@@ -11,13 +11,33 @@
 #include <QLineEdit>
 #include <QMenu>
 #include <QMetaObject>
+#include <QMetaType>
 #include <QMouseEvent>
 #include <QRegularExpression>
 #ifdef DEBUG
 #include <QApplication>
 #endif
 
-namespace QObjectPropertyEditor {
+namespace QObjectPropertyEditor
+{
+    QList<QByteArray> getObjectPropertyNames(QObject *object)
+    {
+        QList<QByteArray> propertyNames = getMetaObjectPropertyNames(*object->metaObject());
+        foreach(const QByteArray &dynamicPropertyName, object->dynamicPropertyNames())
+            propertyNames << dynamicPropertyName;
+        return propertyNames;
+    }
+    
+    QList<QByteArray> getMetaObjectPropertyNames(const QMetaObject &metaObject)
+    {
+        QList<QByteArray> propertyNames;
+        int numProperties = metaObject.propertyCount();
+        for(int i = 0; i < numProperties; ++i) {
+            const QMetaProperty metaProperty = metaObject.property(i);
+            propertyNames << QByteArray(metaProperty.name());
+        }
+        return propertyNames;
+    }
     
     QObject* descendant(QObject *object, const QByteArray &pathToDescendantObject)
     {
@@ -206,7 +226,7 @@ namespace QObjectPropertyEditor {
     {
         // If property names are specified, return the name at column.
         if(!_propertyNames.isEmpty()) {
-            if(_propertyNames.size() > index.row()) {
+            if(_propertyNames.size() > index.column()) {
                 QByteArray propertyName = _propertyNames.at(index.column());
                 if(propertyName.contains('.')) {
                     int pos = propertyName.lastIndexOf('.');
@@ -227,7 +247,7 @@ namespace QObjectPropertyEditor {
         // If column is greater than the number of metaObject properties, check for dynamic properties.
         const QList<QByteArray> &dynamicPropertyNames = object->dynamicPropertyNames();
         if(numProperties + dynamicPropertyNames.size() > index.column())
-            return dynamicPropertyNames[index.column() - numProperties];
+            return dynamicPropertyNames.at(index.column() - numProperties);
         return QByteArray();
     }
     
@@ -286,7 +306,8 @@ namespace QObjectPropertyEditor {
             _objects.insert(i, object);
         }
         endInsertRows();
-        reorderChildObjectsToMatchRowOrder(row + count);
+        if(row + count < _objects.size())
+            reorderChildObjectsToMatchRowOrder(row + count);
         return true;
     }
     
@@ -320,7 +341,7 @@ namespace QObjectPropertyEditor {
     
     void QObjectListPropertyModel::reorderChildObjectsToMatchRowOrder(int firstRow)
     {
-        beginResetModel();
+//        beginResetModel();
         for(int i = firstRow; i < rowCount(); ++i) {
             QObject *object = objectAtIndex(createIndex(i, 0));
             if(object) {
@@ -331,7 +352,7 @@ namespace QObjectPropertyEditor {
                 }
             }
         }
-        endResetModel();
+//        endResetModel();
     }
 
     QWidget* QObjectPropertyDelegate::createEditor(QWidget *parent, const QStyleOptionViewItem &option, const QModelIndex &index) const
