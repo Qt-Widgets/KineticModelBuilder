@@ -213,26 +213,26 @@ namespace MarkovModel
         _interactionsEditor->resizeColumnsToContents();
         _stateGroupsEditor->resizeColumnsToContents();
         
-        bool hasBinaryElements = _model->findChild<BinaryElement*>(QString(), Qt::FindDirectChildrenOnly) ? true : false;
-        if(hasBinaryElements) {
-            if(int index = indexOf(_statesTab) != -1)
-                removeTab(index);
-            if(int index = indexOf(_transitionsTab) != -1)
-                removeTab(index);
-            if(indexOf(_binaryElementsTab) == -1)
-                insertTab(2, _binaryElementsTab, "Elements");
-            if(indexOf(_interactionsTab) == -1)
-                insertTab(3, _interactionsTab, "Interactions");
-        } else {
-            if(indexOf(_statesTab) == -1)
-                insertTab(2, _statesTab, "States");
-            if(indexOf(_transitionsTab) == -1)
-                insertTab(3, _transitionsTab, "Transitions");
-            if(int index = indexOf(_binaryElementsTab) != -1)
-                removeTab(index);
-            if(int index = indexOf(_interactionsTab) != -1)
-                removeTab(index);
-        }
+//        bool hasBinaryElements = _model->findChild<BinaryElement*>(QString(), Qt::FindDirectChildrenOnly) ? true : false;
+//        if(hasBinaryElements) {
+//            if(int index = indexOf(_statesTab) != -1)
+//                removeTab(index);
+//            if(int index = indexOf(_transitionsTab) != -1)
+//                removeTab(index);
+//            if(indexOf(_binaryElementsTab) == -1)
+//                insertTab(2, _binaryElementsTab, "Elements");
+//            if(indexOf(_interactionsTab) == -1)
+//                insertTab(3, _interactionsTab, "Interactions");
+//        } else {
+//            if(indexOf(_statesTab) == -1)
+//                insertTab(2, _statesTab, "States");
+//            if(indexOf(_transitionsTab) == -1)
+//                insertTab(3, _transitionsTab, "Transitions");
+//            if(int index = indexOf(_binaryElementsTab) != -1)
+//                removeTab(index);
+//            if(int index = indexOf(_interactionsTab) != -1)
+//                removeTab(index);
+//        }
     }
     
     void MarkovModelPropertyEditor::getNotesFromEditor()

@@ -229,9 +229,9 @@ namespace MarkovModel
         setName(name);
         
         // Default model.
-        new Variable(this, "k", "8.6173324e-5", "Boltzmann constant (eV/K)");
+        new Variable(this, "k", "0.000086173324", "Boltzmann constant (eV/K)");
         new Variable(this, "R", "0.0019872036", "Gas constant (kcal/mol/K)");
-        new Variable(this, "h", "4.135667662e-15", "Plank constant (eV*s)");
+        new Variable(this, "h", "4.135667662*10^-15", "Plank constant (eV*s)");
         State *A = new State(this, "A");
         State *B = new State(this, "B");
         new Transition(this, A, B);

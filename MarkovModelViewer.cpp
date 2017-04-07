@@ -255,8 +255,17 @@ namespace MarkovModel
         drawGrid();
         if(!_model)
             return;
-//        if(parseExpressions())
-//            model()->constrainVariables(MarkovModel::parseAttributes(parserStimuli()));
+        if(isEvalExprs()) {
+            std::map<QString, QString> stimuliExprs = str2exprMap(exprStimuli());
+            MarkovModel::ParameterMap stimuli;
+            bool ok;
+            for(auto it = stimuliExprs.begin(); it != stimuliExprs.end(); ++it) {
+                stimuli[it->first] = it->second.toDouble(&ok);
+                if(!ok)
+                    stimuli[it->first] = 0;
+            }
+            _model->evalVariables(stimuli);
+        }
         foreach(State *state, _model->findChildren<State*>(QString(), Qt::FindDirectChildrenOnly))
             drawState(state);
         foreach(Transition *transition, _model->findChildren<Transition*>(QString(), Qt::FindDirectChildrenOnly))
@@ -530,12 +539,12 @@ namespace MarkovModel
         }
         // Text above arrow.
         QString text = transition->rate();
-//        if(parseExpressions()) {
-//            try {
-//                text = QString::number(transition->rate(model()->exprParser()));
-//            } catch(...) {
-//            }
-//        }
+        if(isEvalExprs()) {
+            try {
+                text = QString::number(_model->evalExpr(text));
+            } catch(...) {
+            }
+        }
         QVector3D position(length / 2, y0 + _connectionTextOffset, 0);
         int align = Qt::AlignHCenter | Qt::AlignBottom;
         float scale = float(connectionFont().pointSize()) / 1200;
@@ -621,20 +630,20 @@ namespace MarkovModel
         QString text11 = interaction->factor11();
         QString textA1 = interaction->factorA1();
         QString text1B = interaction->factor1B();
-//        if(parseExpressions()) {
-//            try {
-//                text11 = QString::number(interaction->factor11(model()->exprParser()));
-//            } catch(...) {
-//            }
-//            try {
-//                textA1 = QString::number(interaction->factorA1(model()->exprParser()));
-//            } catch(...) {
-//            }
-//            try {
-//                text1B = QString::number(interaction->factor1B(model()->exprParser()));
-//            } catch(...) {
-//            }
-//        }
+        if(isEvalExprs()) {
+            try {
+                text11 = QString::number(_model->evalExpr(text11));
+            } catch(...) {
+            }
+            try {
+                textA1 = QString::number(_model->evalExpr(textA1));
+            } catch(...) {
+            }
+            try {
+                text1B = QString::number(_model->evalExpr(text1B));
+            } catch(...) {
+            }
+        }
         QString text = isLeftToRight ? (textA1 + ", " + text11 + ", " + text1B) : (text1B + ", " + text11 + ", " + textA1);
         QVector3D position(length / 2, _connectionTextOffset, 0);
         int align = Qt::AlignHCenter | Qt::AlignBottom;
