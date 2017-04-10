@@ -82,7 +82,7 @@ namespace MarkovModel
     public:
         // Default constructor.
         Variable(QObject *parent = 0, const QString &name = "", const QString &value = "", const QString &description = "") :
-        QObject(parent), _isConst(true), _min(0), _max(0), _isNumber(false) { setName(name); setValue(value); setDescription(description); }
+        QObject(parent), _isConst(true), _min(0), _max(0), _index(0), _numIndexes(1), _isNumber(false) { setName(name); setValue(value); setDescription(description); }
         
         // Property getters.
         QString name() const { return objectName(); }
@@ -91,8 +91,8 @@ namespace MarkovModel
         bool isConst() const { return _isConst; }
         double min() const { return _min; }
         double max() const { return _max; }
-        int index() const { return _index; }
-        int numIndexes() const { return _numIndexes; }
+        size_t index() const { return _index; }
+        size_t numIndexes() const { return _numIndexes; }
         double number() { return _value.toDouble(&_isNumber); }
         bool isNumber() { return _isNumber; } // Only valid after number() is called.
         
@@ -103,8 +103,8 @@ namespace MarkovModel
         void setIsConst(bool b) { _isConst = b; }
         void setMin(double d) { _min = d; }
         void setMax(double d) { _max = d; }
-        void setIndex(int i) { _index = i; }
-        void setNumIndexes(int i) { _numIndexes = i; }
+        void setIndex(size_t i) { _index = i; }
+        void setNumIndexes(size_t i) { _numIndexes = i; }
         
     protected:
         // Properties.
@@ -113,8 +113,8 @@ namespace MarkovModel
         bool _isConst;
         double _min;
         double _max;
-        int _index;
-        int _numIndexes;
+        size_t _index;
+        size_t _numIndexes;
         bool _isNumber;
     };
     
@@ -458,8 +458,8 @@ namespace MarkovModel
         // Input setIndex refers to the set of variables to use, where multiple variables with the same name
         // are treated as belonging to separate variable sets. For variables with less repeats than
         // the maximum number of sets, the last repeat will be used for the remaining sets.
-        void evalVariables(const ParameterMap &stimuli = ParameterMap(), int setIndex = 0);
-        int numVariableSets();
+        void evalVariables(const ParameterMap &stimuli = ParameterMap(), size_t variableSetIndex = 0);
+        size_t numVariableSets();
         
         // Get model parameters. !!! Only valid after init() and evalVariables() have been called.
         void getStateProbabilities(Eigen::VectorXd &stateProbabilities);

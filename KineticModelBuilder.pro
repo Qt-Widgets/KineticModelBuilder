@@ -2,6 +2,18 @@ TARGET = KineticModelBuilder
 TEMPLATE = app
 QT += core gui widgets opengl xml concurrent svg
 
+#release: DESTDIR = Release
+release: OBJECTS_DIR = Release/.obj
+release: MOC_DIR = Release/.moc
+release: RCC_DIR = Release/.rcc
+release: UI_DIR = Release/.ui
+
+#debug: DESTDIR = Debug
+debug: OBJECTS_DIR = Debug/.obj
+debug: MOC_DIR = Debug/.moc
+debug: RCC_DIR = Debug/.rcc
+debug: UI_DIR = Debug/.ui
+
 # MACX application bundle
 macx: CONFIG += app_bundle
 
@@ -46,7 +58,9 @@ MarkovModelPropertyEditor.h \
 MarkovModelViewer.h \
 QFont3D.h \
 QObjectPropertyEditor.h \
-QObjectPropertyTreeSerializer.h
+QObjectPropertyTreeSerializer.h \
+StimulusClampProtocol.h \
+StimulusClampProtocolPropertyEditor.h
 
 SOURCES += main.cpp \
 MarkovModel.cpp \
@@ -54,4 +68,6 @@ MarkovModelPropertyEditor.cpp \
 MarkovModelViewer.cpp \
 QFont3D.cpp \
 QObjectPropertyEditor.cpp \
-QObjectPropertyTreeSerializer.cpp
+QObjectPropertyTreeSerializer.cpp \
+StimulusClampProtocol.cpp \
+StimulusClampProtocolPropertyEditor.cpp

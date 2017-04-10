@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------------
- * Markov model property editor UI.
+ * MarkovModel property editor UI.
  *
  * Author: Marcel Paz Goldschen-Ohm
  * Email: marcel.goldschen@gmail.com
@@ -22,7 +22,7 @@ namespace MarkovModel
     class MarkovModel;
     
     /* --------------------------------------------------------------------------------
-     * Markov model property editor UI.
+     * MarkovModel property editor UI.
      * -------------------------------------------------------------------------------- */
     class MarkovModelPropertyEditor : public QTabWidget
     {

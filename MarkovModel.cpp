@@ -6,7 +6,6 @@
 #include "MarkovModel.h"
 #include "QObjectPropertyEditor.h"
 #include <algorithm>
-#include <cassert>
 #include <climits>
 #include <cmath>
 #include <stdexcept>
@@ -24,7 +23,7 @@ namespace MarkovModel
         factory.registerCreator("BinaryElement", factory.defaultCreator<BinaryElement>);
         factory.registerCreator("Interaction", factory.defaultCreator<Interaction>);
         factory.registerCreator("StateGroup", factory.defaultCreator<StateGroup>);
-        factory.registerCreator("MarkovModel", factory.defaultCreator<StateGroup>);
+        factory.registerCreator("MarkovModel", factory.defaultCreator<MarkovModel>);
         return factory;
     }
     QObjectPropertyTreeSerializer::ObjectFactory MarkovModel::objectFactory = getObjectFactory();
@@ -319,7 +318,7 @@ namespace MarkovModel
         }
     }
     
-    void MarkovModel::evalVariables(const ParameterMap &stimuli, int setIndex)
+    void MarkovModel::evalVariables(const ParameterMap &stimuli, size_t variableSetIndex)
     {
         parameters = stimuli;
 #ifdef USE_EXPR_TK
@@ -341,7 +340,7 @@ namespace MarkovModel
         _expr.register_symbol_table(_symbols);
 #endif
         foreach(Variable *variable, findChildren<Variable*>(QString(), Qt::FindDirectChildrenOnly)) {
-            if((variable->index() == setIndex) || (variable->index() < setIndex && variable->numIndexes() <= setIndex)) {
+            if((variable->index() == variableSetIndex) || (variable->index() < variableSetIndex && variable->numIndexes() <= variableSetIndex)) {
                 double value = evalExpr(variable->value());
                 parameters[variable->name()] = value;
 #ifdef USE_EXPR_TK
@@ -354,9 +353,9 @@ namespace MarkovModel
         }
     }
     
-    int MarkovModel::numVariableSets()
+    size_t MarkovModel::numVariableSets()
     {
-        int numSets = 0;
+        size_t numSets = 0;
         foreach(Variable *variable, findChildren<Variable*>(QString(), Qt::FindDirectChildrenOnly)) {
             if(variable->numIndexes() > numSets)
                 numSets = variable->numIndexes();
