@@ -148,7 +148,7 @@ namespace StimulusClampProtocol
     {
         int numPts = time.size();
         int numStates = startingProbability.size();
-        while(probability.size() < variableSetIndex)
+        while(probability.size() <= variableSetIndex)
             probability.push_back(Eigen::MatrixXd::Zero(numPts, numStates));
         Eigen::MatrixXd &P = probability.at(variableSetIndex);
         P.setZero(numPts, numStates);
@@ -288,7 +288,7 @@ namespace StimulusClampProtocol
     void Simulation::getProbabilityFromEventChains(size_t numStates, size_t variableSetIndex, AbortFlag *abort, QString */* message */)
     {
         size_t numPts = time.size();
-        while(probability.size() < variableSetIndex)
+        while(probability.size() <= variableSetIndex)
             probability.push_back(Eigen::MatrixXd::Zero(numPts, numStates));
         Eigen::MatrixXd &P = probability.at(variableSetIndex);
         P.setZero(numPts, numStates);
@@ -337,8 +337,25 @@ namespace StimulusClampProtocol
         P /= eventChains.size();
     }
     
+    double Simulation::maxProbabilityError()
+    {
+        double maxError = 0;
+        for(size_t i = 0; i < probability.size(); ++i) {
+            Eigen::MatrixXd &P = probability.at(i);
+            double perr = (P.rowwise().sum().array() - 1).abs().maxCoeff();
+            if(perr > maxError)
+                maxError = perr;
+        }
+        return maxError;
+    }
+    
     StimulusClampProtocol::StimulusClampProtocol(QObject *parent, const QString &name) :
-    QObject(parent)
+    QObject(parent),
+    _start("0"),
+    _duration("1"),
+    _sampleInterval("0.001"),
+    _weight("1"),
+    _startEquilibrated(false)
     {
         setName(name);
     }
@@ -429,7 +446,7 @@ namespace StimulusClampProtocol
                             sim.stimuli[stimulus->name()] = stimulus->waveform(sim.time, row, col);
                     }
                 }
-                // Convert mask to boolean array. Any nonzero value will be set to false (i.e. masked).
+                // Convert mask to boolean array (0, false = masked, 1, true = unmasked).
                 sim.mask = (mask.array() == 0);
                 // Stimulus epochs.
                 sim.findEpochsDiscretizedToSamplePoints();
@@ -470,7 +487,7 @@ namespace StimulusClampProtocol
     }
 #endif
     
-    void Simulator::init()
+    void StimulusClampProtocolSimulator::init()
     {
         model->init(stateNames);
         for(Epoch *epoch : uniqueEpochs) delete epoch;
@@ -479,13 +496,17 @@ namespace StimulusClampProtocol
             protocol->init(uniqueEpochs);
     }
     
-    void Simulator::run()
+    void StimulusClampProtocolSimulator::run()
     {
         try {
             std::vector<QFuture<void> > futures;
             futures.reserve(100);
             for(size_t variableSetIndex = 0; variableSetIndex < model->numVariableSets(); ++variableSetIndex) {
+//                qDebug() << variableSetIndex;
+                QString method = options["Method"].toString();
+//                qDebug() << "method = " << method;
                 // Unique epochs.
+//                qDebug() << "# unique epochs = " << uniqueEpochs.size();
                 for(Epoch *epoch : uniqueEpochs) {
                     if(abort) break;
                     model->evalVariables(epoch->stimuli, variableSetIndex);
@@ -493,11 +514,16 @@ namespace StimulusClampProtocol
                     model->getStateAttributes(epoch->stateAttributes);
                     model->getTransitionRates(epoch->transitionRates);
                     model->getTransitionCharges(epoch->transitionCharges);
+//                    std::cout << "pi = " << epoch->stateProbabilities << std::endl;
+                    for(auto &kv : epoch->stateAttributes)
+                        std::cout << kv.first.toStdString() << " = " << kv.second << std::endl;
+//                    std::cout << "Q = " << std::endl << epoch->transitionRates << std::endl;
+//                    std::cout << "QQ = " << std::endl << epoch->transitionCharges << std::endl;
                     int numStates = epoch->transitionRates.cols();
-                    if(options["Method"] == "Eigen Solver") {
+                    if(method == "Eigen Solver") {
                         std::function<void()> func = std::bind(spectralExpansion, std::ref(epoch->transitionRates), std::ref(epoch->spectralEigenValues), std::ref(epoch->spectralMatrices), &abort);
                         futures.push_back(QtConcurrent::run(func));
-                    } else if(options["Method"] == "Monte Carlo") {
+                    } else if(method == "Monte Carlo") {
                         epoch->spectralEigenValues = Eigen::VectorXd::Zero(1);
                         epoch->spectralMatrices.clear();
                         epoch->randomStateLifetimes.clear();
@@ -514,15 +540,17 @@ namespace StimulusClampProtocol
                     future.waitForFinished();
                 futures.clear();
                 // Simulations.
+//                qDebug() << "# protocols = " << protocols.size();
                 for(StimulusClampProtocol *protocol : protocols) {
                     for(size_t row = 0; row < protocol->simulations.size(); ++row) {
                         for(size_t col = 0; col < protocol->simulations[row].size(); ++col) {
                             if(abort) break;
                             Simulation &sim = protocol->simulations[row][col];
-                            if(options["Method"] == "Eigen Solver") {
+//                            qDebug() << "sim " << row << "x" << col;
+                            if(method == "Eigen Solver") {
                                 std::function<void()> func = std::bind(&Simulation::spectralSimulation, &sim, sim.epochs.begin()->uniqueEpoch->stateProbabilities, protocol->startEquilibrated(), variableSetIndex, &abort, &message);
                                 futures.push_back(QtConcurrent::run(func));
-                            } else if(options["Method"] == "Monte Carlo") {
+                            } else if(method == "Monte Carlo") {
                                 std::function<void()> func = std::bind(&Simulation::monteCarloSimulation, &sim, sim.epochs.begin()->uniqueEpoch->stateProbabilities, std::ref(sim.randomNumberGenerator), options["# Monte Carlo Runs"].toInt(), options["Accumulate Monte Carlo Runs"].toBool(), protocol->startEquilibrated(), variableSetIndex, &abort, &message);
                                 futures.push_back(QtConcurrent::run(func));
                             }
@@ -540,7 +568,7 @@ namespace StimulusClampProtocol
             abort = true;
             throw std::runtime_error(message.toStdString());
         } catch(...) {
-            message = "Unknown error.";
+            message = "Undocumentded error.";
             abort = true;
             throw std::runtime_error(message.toStdString());
         }

@@ -93,7 +93,7 @@ namespace StimulusClampProtocol
     public:
         // Default constructor.
         Stimulus(QObject *parent = 0, const QString &name = "") :
-        QObject(parent), _isActive(true) { setName(name); }
+        QObject(parent), _isActive(true), _repetitions("1"), _period("0") { setName(name); }
         
         // Property getters.
         QString name() const { return objectName(); }
@@ -169,8 +169,8 @@ namespace StimulusClampProtocol
         Epoch *uniqueEpoch;
         
         // Data to be computed for unique epochs only.
-        Eigen::VectorXd stateProbabilities;
-        std::map<QString, Eigen::VectorXd> stateAttributes;
+        Eigen::RowVectorXd stateProbabilities;
+        std::map<QString, Eigen::RowVectorXd> stateAttributes;
         Eigen::SparseMatrix<double> transitionRates; // _ij = rate i->j, _ii = negative sum of rates leaving state i.
         Eigen::SparseMatrix<double> transitionCharges; // _ij = charge moved during transition i->j.
         Eigen::RowVectorXd stateChargeCurrents;
@@ -208,10 +208,10 @@ namespace StimulusClampProtocol
         std::mt19937 randomNumberGenerator;
         
         void findEpochsDiscretizedToSamplePoints();
-        
         void spectralSimulation(Eigen::RowVectorXd startingProbability, bool startEquilibrated = false, size_t variableSetIndex = 0, AbortFlag *abort = 0, QString *message = 0);
         void monteCarloSimulation(Eigen::RowVectorXd startingProbability, std::mt19937 &randomNumberGenerator, size_t numRuns, bool accumulateRuns = false, bool startEquilibrated = false, size_t variableSetIndex = 0, AbortFlag *abort = 0, QString *message = 0);
         void getProbabilityFromEventChains(size_t numStates, size_t variableSetIndex = 0, AbortFlag *abort = 0, QString *message = 0);
+        double maxProbabilityError();
     };
     
     /* --------------------------------------------------------------------------------
@@ -286,7 +286,7 @@ namespace StimulusClampProtocol
     
     /* --------------------------------------------------------------------------------
      * -------------------------------------------------------------------------------- */
-    struct Simulator
+    struct StimulusClampProtocolSimulator
     {
         MarkovModel::MarkovModel *model;
         QStringList stateNames;
@@ -296,8 +296,8 @@ namespace StimulusClampProtocol
         AbortFlag abort;
         QString message;
         
-        Simulator() : model(0) {}
-        ~Simulator() { for(Epoch *epoch : uniqueEpochs) delete epoch; }
+        StimulusClampProtocolSimulator() : model(0) {}
+        ~StimulusClampProtocolSimulator() { for(Epoch *epoch : uniqueEpochs) delete epoch; }
         
         void init();
         void run();

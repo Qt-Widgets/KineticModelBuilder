@@ -98,6 +98,9 @@ namespace MarkovModel
         layout->addWidget(editor);
         dialog.show();
         editor->resizeColumnToContents(0);
+        if(editor->columnWidth(0) < 200)
+            editor->setColumnWidth(0, 200);
+        dialog.resize(400, 300);
         dialog.exec();
     }
     
@@ -140,8 +143,10 @@ namespace MarkovModel
         layout->addWidget(editor);
         dialog.show();
         editor->resizeColumnToContents(0);
+        if(editor->columnWidth(0) < 200)
+            editor->setColumnWidth(0, 200);
         QPoint topLeft = mapToGlobal(QPoint(0, 0));
-        dialog.setGeometry(topLeft.x(), topLeft.y(), width(), height());
+        dialog.setGeometry(topLeft.x(), topLeft.y(), 500, height());
         dialog.exec();
     }
     
@@ -174,7 +179,7 @@ namespace MarkovModel
             menu->addAction("Clear Model", this, SLOT(clearModel()));
         }
         menu->addSeparator();
-        menu->addAction("Options", this, SLOT(editOptions()));
+        menu->addAction("Viewer Options", this, SLOT(editOptions()));
         return menu;
     }
     

@@ -363,13 +363,13 @@ namespace MarkovModel
         return numSets;
     }
     
-    void MarkovModel::getStateProbabilities(Eigen::VectorXd &stateProbabilities)
+    void MarkovModel::getStateProbabilities(Eigen::RowVectorXd &stateProbabilities)
     {
         QList<BinaryElement*> binaryElements = findChildren<BinaryElement*>(QString(), Qt::FindDirectChildrenOnly);
         int numBinaryElements = binaryElements.size();
         if(numBinaryElements) {
             int numStates = pow(2, numBinaryElements);
-            stateProbabilities = Eigen::VectorXd::Ones(numStates);
+            stateProbabilities = Eigen::RowVectorXd::Ones(numStates);
             Eigen::VectorXd binaryElementProbabilities0 = Eigen::VectorXd::Ones(numBinaryElements);
             for(int j = 0; j < numBinaryElements; ++j) {
                 double probability0 = evalExpr(binaryElements[j]->probability0());
@@ -386,7 +386,7 @@ namespace MarkovModel
             }
         } else {
             QList<State*> states = findChildren<State*>(QString(), Qt::FindDirectChildrenOnly);
-            stateProbabilities = Eigen::VectorXd::Zero(states.size());
+            stateProbabilities = Eigen::RowVectorXd::Zero(states.size());
             int i = 0;
             foreach(State *state, states) {
                 double probability = evalExpr(state->probability());
@@ -402,7 +402,7 @@ namespace MarkovModel
         }
     }
     
-    void MarkovModel::getStateAttributes(std::map<QString, Eigen::VectorXd> &stateAttributes)
+    void MarkovModel::getStateAttributes(std::map<QString, Eigen::RowVectorXd> &stateAttributes)
     {
         QList<BinaryElement*> binaryElements = findChildren<BinaryElement*>(QString(), Qt::FindDirectChildrenOnly);
         QList<State*> states;
@@ -421,9 +421,9 @@ namespace MarkovModel
                     QString attrName = it->first;
                     double attrValue = evalExpr(it->second);
                     if(stateAttributes.find(attrName) == stateAttributes.end())
-                        stateAttributes[attrName] = Eigen::VectorXd::Zero(numStates);
+                        stateAttributes[attrName] = Eigen::RowVectorXd::Zero(numStates);
                     if(attrValue) {
-                        Eigen::VectorXd &stateAttrs = stateAttributes[attrName];
+                        Eigen::RowVectorXd &stateAttrs = stateAttributes[attrName];
                         for(int stateIndex : stateGroup->stateIndexes)
                             stateAttrs[stateIndex] = attrValue;
                     }
@@ -439,7 +439,7 @@ namespace MarkovModel
                     QString attrName = it->first;
                     double attrValue = evalExpr(it->second);
                     if(stateAttributes.find(attrName) == stateAttributes.end())
-                        stateAttributes[attrName] = Eigen::VectorXd::Zero(numStates);
+                        stateAttributes[attrName] = Eigen::RowVectorXd::Zero(numStates);
                     if(attrValue)
                         stateAttributes[attrName][stateIndex] = attrValue;
                 }
@@ -662,15 +662,15 @@ namespace MarkovModel
             
             double vz = 3, vx = 3.14*vz, vy = sqrt(pow((2 + 0) * -3.14, 2));
             
-            Eigen::VectorXd P, _P(2);
+            Eigen::RowVectorXd P, _P(2);
             model.getStateProbabilities(P);
             _P << 1, 0;
             VERIFY(P.isApprox(_P), "Invalid state probabilities.");
             
-            std::map<QString, Eigen::VectorXd> attrs;
+            std::map<QString, Eigen::RowVectorXd> attrs;
             model.getStateAttributes(attrs);
             VERIFY(attrs.size() == 2, "Wrong # of state attributes.");
-            Eigen::VectorXd _g(2), _F(2);
+            Eigen::RowVectorXd _g(2), _F(2);
             _g << 0, 15 * 1 + pow(0 * 7, 3);
             _F << 0, -100.1 - 0 / sqrt(9.45);
             VERIFY(attrs["g"].isApprox(_g), "Invalid state g.");
@@ -732,15 +732,15 @@ namespace MarkovModel
             
             double vz = 3, vx = 3.14*vz, vy = sqrt(pow((2 + 0) * -3.14, 2));
             
-            Eigen::VectorXd P, _P(4);
+            Eigen::RowVectorXd P, _P(4);
             model.getStateProbabilities(P);
             _P << 1, 0, 0, 0;
             VERIFY(P.isApprox(_P), "Invalid state probabilities.");
             
-            std::map<QString, Eigen::VectorXd> attrs;
+            std::map<QString, Eigen::RowVectorXd> attrs;
             model.getStateAttributes(attrs);
             VERIFY(attrs.size() == 2, "Wrong # of state attributes.");
-            Eigen::VectorXd _g(4), _F(4);
+            Eigen::RowVectorXd _g(4), _F(4);
             _g << 0, 0, 15.0, 15.0;
             _F << 0, 0, 100, 100;
             VERIFY(attrs["g"].isApprox(_g), "Invalid state g.");

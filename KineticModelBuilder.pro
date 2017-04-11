@@ -60,6 +60,7 @@ QFont3D.h \
 QObjectPropertyEditor.h \
 QObjectPropertyTreeSerializer.h \
 StimulusClampProtocol.h \
+StimulusClampProtocolPlot.h \
 StimulusClampProtocolPropertyEditor.h
 
 SOURCES += main.cpp \
@@ -70,4 +71,5 @@ QFont3D.cpp \
 QObjectPropertyEditor.cpp \
 QObjectPropertyTreeSerializer.cpp \
 StimulusClampProtocol.cpp \
+StimulusClampProtocolPlot.cpp \
 StimulusClampProtocolPropertyEditor.cpp

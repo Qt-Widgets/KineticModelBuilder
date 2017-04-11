@@ -462,8 +462,8 @@ namespace MarkovModel
         size_t numVariableSets();
         
         // Get model parameters. !!! Only valid after init() and evalVariables() have been called.
-        void getStateProbabilities(Eigen::VectorXd &stateProbabilities);
-        void getStateAttributes(std::map<QString, Eigen::VectorXd> &stateAttributes);
+        void getStateProbabilities(Eigen::RowVectorXd &stateProbabilities);
+        void getStateAttributes(std::map<QString, Eigen::RowVectorXd> &stateAttributes);
         void getTransitionRates(Eigen::SparseMatrix<double> &transitionRates);
         void getTransitionCharges(Eigen::SparseMatrix<double> &transitionCharges);
         
