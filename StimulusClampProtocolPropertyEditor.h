@@ -43,17 +43,25 @@ namespace StimulusClampProtocol
         // Property models.
         QObjectPropertyEditor::QObjectPropertyModel _protocolModel;
         QObjectPropertyEditor::QObjectListPropertyModel _stimuliModel;
+        QObjectPropertyEditor::QObjectListPropertyModel _waveformsModel;
+        QObjectPropertyEditor::QObjectListPropertyModel _summariesModel;
         
         // Property model views.
         QObjectPropertyEditor::QObjectPropertyEditor *_protocolEditor;
         QObjectPropertyEditor::QObjectListPropertyEditor *_stimuliEditor;
+        QObjectPropertyEditor::QObjectListPropertyEditor *_waveformsEditor;
+        QObjectPropertyEditor::QObjectListPropertyEditor *_summariesEditor;
         
         // UIs for each view.
         QWidget *_protocolTab;
         QWidget *_stimuliTab;
+        QWidget *_waveformsTab;
+        QWidget *_summariesTab;
         
         // Protocol notes UI.
         QPlainTextEdit *_notesEditor;
+        
+        QWidget* getTab(QObjectPropertyEditor::QObjectListPropertyEditor *editor);
         
     protected slots:
         void getNotesFromEditor();

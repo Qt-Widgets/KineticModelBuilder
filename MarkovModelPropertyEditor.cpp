@@ -7,6 +7,7 @@
 #include "MarkovModel.h"
 #include <QByteArray>
 #include <QHash>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QList>
 #include <QString>
@@ -35,6 +36,10 @@ namespace MarkovModel
         _interactionsEditor->setModel(&_interactionsModel);
         _stateGroupsEditor->setModel(&_stateGroupsModel);
         
+        // Because deleting state/elements also deletes connected transitions/interactions.
+        connect(&_statesModel, SIGNAL(rowCountChanged()), this, SLOT(updateTransitionsModel()));
+        connect(&_binaryElementsModel, SIGNAL(rowCountChanged()), this, SLOT(updateInteractionsModel()));
+        
         _modelTab = new QWidget();
         {
             _notesEditor = new QPlainTextEdit();
@@ -46,72 +51,12 @@ namespace MarkovModel
             layout->addWidget(new QLabel("Notes"));
             layout->addWidget(_notesEditor);
         }
-        _variablesTab = new QWidget();
-        {
-            QToolButton *addRowButton = new QToolButton();
-            addRowButton->setText("+");
-            connect(addRowButton, SIGNAL(clicked()), _variablesEditor, SLOT(appendRow()));
-            QVBoxLayout *layout = new QVBoxLayout(_variablesTab);
-            layout->setContentsMargins(1, 1, 1, 1);
-            layout->setSpacing(1);
-            layout->addWidget(addRowButton);
-            layout->addWidget(_variablesEditor);
-        }
-        _statesTab = new QWidget();
-        {
-            QToolButton *addRowButton = new QToolButton();
-            addRowButton->setText("+");
-            connect(addRowButton, SIGNAL(clicked()), _statesEditor, SLOT(appendRow()));
-            QVBoxLayout *layout = new QVBoxLayout(_statesTab);
-            layout->setContentsMargins(1, 1, 1, 1);
-            layout->setSpacing(1);
-            layout->addWidget(addRowButton);
-            layout->addWidget(_statesEditor);
-        }
-        _transitionsTab = new QWidget();
-        {
-            QToolButton *addRowButton = new QToolButton();
-            addRowButton->setText("+");
-            connect(addRowButton, SIGNAL(clicked()), _transitionsEditor, SLOT(appendRow()));
-            QVBoxLayout *layout = new QVBoxLayout(_transitionsTab);
-            layout->setContentsMargins(1, 1, 1, 1);
-            layout->setSpacing(1);
-            layout->addWidget(addRowButton);
-            layout->addWidget(_transitionsEditor);
-        }
-        _binaryElementsTab = new QWidget();
-        {
-            QToolButton *addRowButton = new QToolButton();
-            addRowButton->setText("+");
-            connect(addRowButton, SIGNAL(clicked()), _binaryElementsEditor, SLOT(appendRow()));
-            QVBoxLayout *layout = new QVBoxLayout(_binaryElementsTab);
-            layout->setContentsMargins(1, 1, 1, 1);
-            layout->setSpacing(1);
-            layout->addWidget(addRowButton);
-            layout->addWidget(_binaryElementsEditor);
-        }
-        _interactionsTab = new QWidget();
-        {
-            QToolButton *addRowButton = new QToolButton();
-            addRowButton->setText("+");
-            connect(addRowButton, SIGNAL(clicked()), _interactionsEditor, SLOT(appendRow()));
-            QVBoxLayout *layout = new QVBoxLayout(_interactionsTab);
-            layout->setContentsMargins(1, 1, 1, 1);
-            layout->setSpacing(1);
-            layout->addWidget(addRowButton);
-            layout->addWidget(_interactionsEditor);
-        }
-        _stateGroupsTab = new QWidget();
-        {
-            QToolButton *addRowButton = new QToolButton();
-            addRowButton->setText("+");
-            connect(addRowButton, SIGNAL(clicked()), _stateGroupsEditor, SLOT(appendRow()));
-            QVBoxLayout *layout = new QVBoxLayout(_stateGroupsTab);
-            layout->setContentsMargins(1, 1, 1, 1);
-            layout->setSpacing(1);
-            layout->addWidget(addRowButton);
-            layout->addWidget(_stateGroupsEditor);
-        }
+        _variablesTab = getTab(_variablesEditor);
+        _statesTab = getTab(_statesEditor);
+        _transitionsTab = getTab(_transitionsEditor);
+        _binaryElementsTab = getTab(_binaryElementsEditor);
+        _interactionsTab = getTab(_interactionsEditor);
+        _stateGroupsTab = getTab(_stateGroupsEditor);
         
         addTab(_modelTab, "Model");
         addTab(_variablesTab, "Variables");
@@ -213,32 +158,74 @@ namespace MarkovModel
         _interactionsEditor->resizeColumnsToContents();
         _stateGroupsEditor->resizeColumnsToContents();
         
-//        bool hasBinaryElements = _model->findChild<BinaryElement*>(QString(), Qt::FindDirectChildrenOnly) ? true : false;
-//        if(hasBinaryElements) {
-//            if(int index = indexOf(_statesTab) != -1)
-//                removeTab(index);
-//            if(int index = indexOf(_transitionsTab) != -1)
-//                removeTab(index);
-//            if(indexOf(_binaryElementsTab) == -1)
-//                insertTab(2, _binaryElementsTab, "Elements");
-//            if(indexOf(_interactionsTab) == -1)
-//                insertTab(3, _interactionsTab, "Interactions");
-//        } else {
-//            if(indexOf(_statesTab) == -1)
-//                insertTab(2, _statesTab, "States");
-//            if(indexOf(_transitionsTab) == -1)
-//                insertTab(3, _transitionsTab, "Transitions");
-//            if(int index = indexOf(_binaryElementsTab) != -1)
-//                removeTab(index);
-//            if(int index = indexOf(_interactionsTab) != -1)
-//                removeTab(index);
-//        }
+        bool hasBinaryElements = _model->findChild<BinaryElement*>(QString(), Qt::FindDirectChildrenOnly) ? true : false;
+        if(hasBinaryElements) {
+            int index = indexOf(_statesTab);
+            if(index != -1)
+                removeTab(index);
+            index = indexOf(_transitionsTab);
+            if(index != -1)
+                removeTab(index);
+            if(indexOf(_binaryElementsTab) == -1)
+                insertTab(2, _binaryElementsTab, "Elements");
+            if(indexOf(_interactionsTab) == -1)
+                insertTab(3, _interactionsTab, "Interactions");
+        } else {
+            if(indexOf(_statesTab) == -1)
+                insertTab(2, _statesTab, "States");
+            if(indexOf(_transitionsTab) == -1)
+                insertTab(3, _transitionsTab, "Transitions");
+            int index = indexOf(_binaryElementsTab);
+            if(index != -1)
+                removeTab(index);
+            index = indexOf(_interactionsTab);
+            if(index != -1)
+                removeTab(index);
+        }
+    }
+    
+    QWidget* MarkovModelPropertyEditor::getTab(QObjectPropertyEditor::QObjectListPropertyEditor *editor)
+    {
+        QToolButton *addRowButton = new QToolButton();
+        addRowButton->setText("+");
+        connect(addRowButton, SIGNAL(clicked()), editor, SLOT(appendRow()));
+        
+        QToolButton *delRowButton = new QToolButton();
+        delRowButton->setText("-");
+        connect(delRowButton, SIGNAL(clicked()), editor, SLOT(removeSelectedRows()));
+        
+        QHBoxLayout *buttons = new QHBoxLayout();
+        buttons->setContentsMargins(1, 1, 1, 1);
+        buttons->setSpacing(1);
+        buttons->addWidget(addRowButton);
+        buttons->addWidget(delRowButton);
+        buttons->addStretch();
+        
+        QWidget *tab = new QWidget();
+        QVBoxLayout *layout = new QVBoxLayout(tab);
+        layout->setContentsMargins(1, 1, 1, 1);
+        layout->setSpacing(1);
+        layout->addLayout(buttons);
+        layout->addWidget(editor);
+        return tab;
     }
     
     void MarkovModelPropertyEditor::getNotesFromEditor()
     {
         if(_model && _notesEditor)
             _model->setNotes(_notesEditor->toPlainText());
+    }
+    
+    void MarkovModelPropertyEditor::updateTransitionsModel()
+    {
+        if(_model)
+            _transitionsModel.setObjects(_model->findChildren<Transition*>(QString(), Qt::FindDirectChildrenOnly));
+    }
+    
+    void MarkovModelPropertyEditor::updateInteractionsModel()
+    {
+        if(_model)
+            _interactionsModel.setObjects(_model->findChildren<Interaction*>(QString(), Qt::FindDirectChildrenOnly));
     }
 
 } // MarkovModel

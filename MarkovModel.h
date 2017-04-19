@@ -24,10 +24,10 @@
 
 #include <map>
 #include <vector>
+#include <QFileInfo>
 #include <QObject>
 #include <QString>
 #include <QVector3D>
-#include <QWidget>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #ifdef USE_EXPR_TK
@@ -43,6 +43,7 @@
 
 namespace MarkovModel
 {
+
     // For dynamic object creation.
     QObjectPropertyTreeSerializer::ObjectFactory getObjectFactory();
     
@@ -445,9 +446,6 @@ namespace MarkovModel
         Transition* findTransition(State *from, State *to);
         Interaction* findInteraction(BinaryElement *A, BinaryElement *B);
         
-        // Delete all model objects.
-        void clear();
-        
         // This must be called after altering the model structure (nodes/connections) or state groups.
         // Also supplies the names of the model's states.
         void init(QStringList &stateNames);
@@ -479,9 +477,18 @@ namespace MarkovModel
         void dump(std::ostream &out = std::cout);
 #endif
         
+    public slots:
+        void clear();
+        void open(QString filePath = "");
+        void save();
+        void saveAs(QString filePath = "");
+        
     protected:
         // Properties.
         QString _notes;
+        
+        // File info.
+        QFileInfo _fileInfo;
         
         // Math expression parser.
 #ifdef USE_EXPR_TK

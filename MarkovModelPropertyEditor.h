@@ -71,8 +71,12 @@ namespace MarkovModel
         // Model notes UI.
         QPlainTextEdit *_notesEditor;
         
+        QWidget* getTab(QObjectPropertyEditor::QObjectListPropertyEditor *editor);
+        
     protected slots:
         void getNotesFromEditor();
+        void updateTransitionsModel();
+        void updateInteractionsModel();
     };
     
 } // MarkovModel

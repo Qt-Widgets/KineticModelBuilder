@@ -67,6 +67,17 @@ namespace MarkovModel
         makeCurrent();
     }
     
+    void MarkovModelViewer::setModel(MarkovModel* model)
+    {
+        if(_model)
+            disconnect(_model, SIGNAL(objectNameChanged(QString)), this, SLOT(setWindowTitle(QString)));
+        _model = model;
+        if(_model)
+            connect(_model, SIGNAL(objectNameChanged(QString)), this, SLOT(setWindowTitle(QString)));
+        setObjectName(_model ? _model->name() : "");
+        repaint();
+    }
+    
     void MarkovModelViewer::goToDefaultView()
     {
         _eye = QVector3D(0, 0, 50);
@@ -91,6 +102,7 @@ namespace MarkovModel
         editor->setModel(&propertyModel);
         
         QDialog dialog(this);
+        dialog.setModal(true);
         dialog.setWindowTitle(_selectedObject->metaObject()->className());
         QVBoxLayout *layout = new QVBoxLayout(&dialog);
         layout->setContentsMargins(1, 1, 1, 1);
@@ -109,6 +121,7 @@ namespace MarkovModel
         if(!_model)
             return;
         QDialog dialog(this);
+        dialog.setModal(true);
         dialog.setWindowTitle("Model Parameters");
         QVBoxLayout *layout = new QVBoxLayout(&dialog);
         layout->setContentsMargins(1, 1, 1, 1);
@@ -136,6 +149,7 @@ namespace MarkovModel
         editor->setModel(&propertyModel);
         
         QDialog dialog(this);
+        dialog.setModal(true);
         dialog.setWindowTitle("Model Viewer Options");
         QVBoxLayout *layout = new QVBoxLayout(&dialog);
         layout->setContentsMargins(1, 1, 1, 1);
@@ -165,19 +179,17 @@ namespace MarkovModel
     {
         QMenu *menu = new QMenu(title);
         menu->addAction("Reset View", this, SLOT(goToDefaultView()));
-        if(_model) {
-            menu->addSeparator();
-            menu->addAction("Model Parameters", this, SLOT(editModel()));
-            menu->addSeparator();
-            menu->addAction("Add State", this, SLOT(addState()));
-            menu->addAction("Add Transition", this, SLOT(addTransition()));
-            menu->addAction("Add Binary Element", this, SLOT(addBinaryElement()));
-            menu->addAction("Add Interaction", this, SLOT(addInteraction()));
-            menu->addSeparator();
-            menu->addAction("Remove Selected Object", this, SLOT(removeSelectedObject()));
-            menu->addSeparator();
-            menu->addAction("Clear Model", this, SLOT(clearModel()));
-        }
+        menu->addSeparator();
+        menu->addAction("Model Parameters", this, SLOT(editModel()), QKeySequence::Italic);
+        menu->addSeparator();
+        menu->addAction("Add State", this, SLOT(addState()));
+        menu->addAction("Add Transition", this, SLOT(addTransition()));
+        menu->addAction("Add Binary Element", this, SLOT(addBinaryElement()));
+        menu->addAction("Add Interaction", this, SLOT(addInteraction()));
+        menu->addSeparator();
+        menu->addAction("Remove Selected Object", this, SLOT(removeSelectedObject()));
+        menu->addSeparator();
+        menu->addAction("Clear Model", this, SLOT(clearModel()));
         menu->addSeparator();
         menu->addAction("Viewer Options", this, SLOT(editOptions()));
         return menu;

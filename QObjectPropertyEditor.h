@@ -131,6 +131,10 @@ namespace QObjectPropertyEditor
         bool moveRows(const QModelIndex &sourceParent, int sourceRow, int count, const QModelIndex &destinationParent, int destinationRow);
         void reorderChildObjectsToMatchRowOrder(int firstRow = 0);
         
+    signals:
+        void rowCountChanged();
+        void rowOrderChanged();
+        
     protected:
         QObjectList _objects;
         QList<QByteArray> _propertyNames;

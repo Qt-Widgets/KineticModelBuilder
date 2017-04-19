@@ -1,8 +1,5 @@
 #include <QApplication>
-#include "MarkovModel.h"
-#include "MarkovModelViewer.h"
-#include "StimulusClampProtocol.h"
-#include "StimulusClampProtocolPlot.h"
+#include "Project.h"
 #ifdef DEBUG
 #include <iostream>
 #include <QDebug>
@@ -15,30 +12,36 @@ int main(int argc, char **argv)
 
     QApplication app(argc, argv);
     
-    MarkovModel::MarkovModel model;
-    MarkovModel::MarkovModelViewer viewer;
-    viewer.setModel(&model);
-    viewer.show();
+    KineticModelBuilder::Project project;
+    project.newMarkovModel();
+    project.newStimulusClampProtocol();
+//    project.dump(std::cout);
     
-    StimulusClampProtocol::StimulusClampProtocol protocol;
-    
-    StimulusClampProtocol::StimulusClampProtocolSimulator sim;
-    sim.model = &model;
-    sim.protocols.push_back(&protocol);
-    sim.options["Method"] = "Eigen Solver";
-    try {
-        sim.init();
-        sim.run();
-    } catch(std::runtime_error &e) {
-        std::cout << e.what() << std::endl;
-    } catch(...) {
-        std::cout << "Unknown error." << std::endl;
-    }
-    
-    StimulusClampProtocol::StimulusClampProtocolPlot plot;
-    plot.plotProtocol(&protocol, sim.stateNames);
-    plot.show();
+//    MarkovModel::MarkovModel model;
+//    MarkovModel::MarkovModelViewer viewer;
+//    viewer.setModel(&model);
+//    viewer.show();
+//    
+//    StimulusClampProtocol::StimulusClampProtocol protocol;
+//    
+//    StimulusClampProtocol::StimulusClampProtocolSimulator sim;
+//    sim.model = &model;
+//    sim.protocols.push_back(&protocol);
+//    sim.options["Method"] = "Eigen Solver";
+//    try {
+//        sim.init();
+//        sim.run();
+//    } catch(std::runtime_error &e) {
+//        std::cout << e.what() << std::endl;
+//    } catch(...) {
+//        std::cout << "Unknown error." << std::endl;
+//    }
+//    
+//    StimulusClampProtocol::StimulusClampProtocolPlot plot;
+//    plot.plotProtocol(&protocol, sim.stateNames);
+//    plot.show();
 
     int status = app.exec();
+//    project.dump(std::cout);
     return status;
 }

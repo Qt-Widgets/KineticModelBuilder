@@ -9,7 +9,10 @@
 #include <climits>
 #include <cmath>
 #include <stdexcept>
+#include <QFile>
+#include <QFileDialog>
 #include <QJsonDocument>
+#include <QTextStream>
 #include <QVariantMap>
 
 namespace MarkovModel
@@ -17,13 +20,13 @@ namespace MarkovModel
     QObjectPropertyTreeSerializer::ObjectFactory getObjectFactory()
     {
         QObjectPropertyTreeSerializer::ObjectFactory factory;
-        factory.registerCreator("Variable", factory.defaultCreator<Variable>);
-        factory.registerCreator("State", factory.defaultCreator<State>);
-        factory.registerCreator("Transition", factory.defaultCreator<Transition>);
-        factory.registerCreator("BinaryElement", factory.defaultCreator<BinaryElement>);
-        factory.registerCreator("Interaction", factory.defaultCreator<Interaction>);
-        factory.registerCreator("StateGroup", factory.defaultCreator<StateGroup>);
-        factory.registerCreator("MarkovModel", factory.defaultCreator<MarkovModel>);
+        factory.registerCreator("MarkovModel::Variable", factory.defaultCreator<Variable>);
+        factory.registerCreator("MarkovModel::State", factory.defaultCreator<State>);
+        factory.registerCreator("MarkovModel::Transition", factory.defaultCreator<Transition>);
+        factory.registerCreator("MarkovModel::BinaryElement", factory.defaultCreator<BinaryElement>);
+        factory.registerCreator("MarkovModel::Interaction", factory.defaultCreator<Interaction>);
+        factory.registerCreator("MarkovModel::StateGroup", factory.defaultCreator<StateGroup>);
+        factory.registerCreator("MarkovModel::MarkovModel", factory.defaultCreator<MarkovModel>);
         return factory;
     }
     QObjectPropertyTreeSerializer::ObjectFactory MarkovModel::objectFactory = getObjectFactory();
@@ -256,13 +259,6 @@ namespace MarkovModel
                 return interaction;
         }
         return 0;
-    }
-    
-    void MarkovModel::clear()
-    {
-        qDeleteAll(findChildren<Transition*>(QString(), Qt::FindDirectChildrenOnly));
-        qDeleteAll(findChildren<Interaction*>(QString(), Qt::FindDirectChildrenOnly));
-        qDeleteAll(children());
     }
     
     void MarkovModel::init(QStringList &stateNames)
@@ -617,6 +613,52 @@ namespace MarkovModel
 #endif
     }
 #endif
+    
+    void MarkovModel::clear()
+    {
+        qDeleteAll(findChildren<Transition*>(QString(), Qt::FindDirectChildrenOnly));
+        qDeleteAll(findChildren<Interaction*>(QString(), Qt::FindDirectChildrenOnly));
+        qDeleteAll(children());
+    }
+    
+    void MarkovModel::open(QString filePath)
+    {
+        if(filePath.isEmpty())
+            filePath = QFileDialog::getOpenFileName(0, "Open Markov Model...", _fileInfo.absoluteFilePath());
+        if(filePath.isEmpty())
+            return;
+        QFile file(filePath);
+        if(!file.open(QIODevice::Text | QIODevice::ReadOnly))
+            return;
+        QString buffer = file.readAll();
+        QVariantMap data = QJsonDocument::fromJson(buffer.toUtf8()).toVariant().toMap();
+        if(data.contains("MarkovModel::MarkovModel"))
+            QObjectPropertyTreeSerializer::deserialize(this, data["MarkovModel::MarkovModel"].toMap(), &objectFactory);
+        _fileInfo = QFileInfo(file);
+        file.close();
+    }
+    
+    void MarkovModel::save()
+    {
+        saveAs(_fileInfo.absoluteFilePath());
+    }
+    
+    void MarkovModel::saveAs(QString filePath)
+    {
+        if(filePath.isEmpty())
+            filePath = QFileDialog::getSaveFileName(0, "Save Markov Model...", _fileInfo.absoluteFilePath());
+        if(filePath.isEmpty())
+            return;
+        QFile file(filePath);
+        if(!file.open(QIODevice::Text | QIODevice::WriteOnly))
+            return;
+        QTextStream out(&file);
+        QVariantMap data;
+        data["MarkovModel::MarkovModel"] = QObjectPropertyTreeSerializer::serialize(this, -1, true, false);
+        out << QJsonDocument::fromVariant(data).toJson(QJsonDocument::Indented);
+        _fileInfo = QFileInfo(file);
+        file.close();
+    }
     
 #ifdef DEBUG
 #define VERIFY(x, errMsg) if(!(x)) { ++numErrors; std::cout << errMsg << std::endl; }

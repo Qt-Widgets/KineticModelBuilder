@@ -85,7 +85,7 @@ namespace QObjectPropertyTreeSerializer
                     QObject *child = 0;
                     if(className == QByteArray("QObject"))
                         child = new QObject;
-                    else if(factory && factory->creator(className))
+                    else if(factory && factory->hasCreator(className))
                         child = factory->create(className);
                     if(child) {
                         child->setParent(object);
@@ -137,7 +137,7 @@ namespace QObjectPropertyTreeSerializer
                             QObject *child = 0;
                             if(className == QByteArray("QObject"))
                                 child = new QObject;
-                            else if(factory && factory->creator(className))
+                            else if(factory && factory->hasCreator(className))
                                 child = factory->create(className);
                             if(child) {
                                 child->setParent(object);

@@ -33,7 +33,9 @@ namespace QObjectPropertyTreeSerializer
         
     public:
         void registerCreator(const QByteArray &className, ObjectCreatorFuncPtr creator) { _objectCreatorMap[className] = creator; }
-        ObjectCreatorFuncPtr creator(const QByteArray &className) const { return _objectCreatorMap.contains(className) ? _objectCreatorMap.value(className) : 0; }
+        bool hasCreator(const QByteArray &className) const { return _objectCreatorMap.contains(className); }
+        ObjectCreatorFuncPtr getCreator(const QByteArray &className) const { return _objectCreatorMap.value(className); }
+        QList<QByteArray> creators() const { return _objectCreatorMap.keys(); }
         QObject* create(const QByteArray &className) const { return _objectCreatorMap.contains(className) ? (*_objectCreatorMap.value(className))() : 0; }
         
         // For convenience. e.g. call ObjectFactory::registerCreator("MyClass", ObjectFactory::defaultCreator<MyClass>);

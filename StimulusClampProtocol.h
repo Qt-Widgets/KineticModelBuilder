@@ -15,7 +15,13 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <QCloseEvent>
+#include <QFileInfo>
+#include <QFuture>
+#include <QFutureWatcher>
 #include <QObject>
+#include <QProgressDialog>
+#include <QRegularExpression>
 #include <QString>
 #include <QWidget>
 #include <Eigen/Dense>
@@ -69,6 +75,11 @@ namespace StimulusClampProtocol
      * !!! This will invalidate the input matrix Q.
      * -------------------------------------------------------------------------------- */
     void spectralExpansion(const Eigen::SparseMatrix<double> &Q, Eigen::VectorXd &eigenValues, std::vector<Eigen::MatrixXd> &spectralMatrices, AbortFlag *abort = 0);
+    
+    /* --------------------------------------------------------------------------------
+     * Find sample indexes in range.
+     * -------------------------------------------------------------------------------- */
+    void findIndexesInRange(const Eigen::VectorXd &time, double start, double stop, int *firstPt, int *numPts);
     
     /* --------------------------------------------------------------------------------
      * For dynamic object creation.
@@ -141,17 +152,6 @@ namespace StimulusClampProtocol
     };
     
     /* --------------------------------------------------------------------------------
-     * Index range in [first, first + num).
-     * -------------------------------------------------------------------------------- */
-//    struct IndexRange
-//    {
-//        int first;
-//        int num;
-//        
-//        IndexRange(int first = -1, int num = 0) : first(first), num(num) {}
-//    };
-    
-    /* --------------------------------------------------------------------------------
      * Period of constant stimuli.
      * -------------------------------------------------------------------------------- */
     struct Epoch
@@ -209,9 +209,117 @@ namespace StimulusClampProtocol
         
         void findEpochsDiscretizedToSamplePoints();
         void spectralSimulation(Eigen::RowVectorXd startingProbability, bool startEquilibrated = false, size_t variableSetIndex = 0, AbortFlag *abort = 0, QString *message = 0);
-        void monteCarloSimulation(Eigen::RowVectorXd startingProbability, std::mt19937 &randomNumberGenerator, size_t numRuns, bool accumulateRuns = false, bool startEquilibrated = false, size_t variableSetIndex = 0, AbortFlag *abort = 0, QString *message = 0);
-        void getProbabilityFromEventChains(size_t numStates, size_t variableSetIndex = 0, AbortFlag *abort = 0, QString *message = 0);
+        void monteCarloSimulation(Eigen::RowVectorXd startingProbability, std::mt19937 &randomNumberGenerator, size_t numRuns, bool accumulateRuns = false, bool sampleRuns = true, bool startEquilibrated = false, size_t variableSetIndex = 0, AbortFlag *abort = 0, QString *message = 0);
+        void getProbabilityFromEventChains(Eigen::MatrixXd &P, size_t numStates, const std::vector<MonteCarloEventChain> &eventChains, AbortFlag *abort = 0, QString *message = 0);
         double maxProbabilityError();
+    };
+    
+    /* --------------------------------------------------------------------------------
+     * -------------------------------------------------------------------------------- */
+    class Waveform : public QObject
+    {
+        Q_OBJECT
+        Q_PROPERTY(QString Name READ name WRITE setName)
+        Q_PROPERTY(bool Active READ isActive WRITE setIsActive)
+        Q_PROPERTY(QString Expr READ expr WRITE setExpr)
+        
+    public:
+        // Default constructor.
+        Waveform(QObject *parent = 0, const QString &name = "") :
+        QObject(parent), _isActive(true) { setName(name); }
+        
+        // Property getters.
+        QString name() const { return objectName(); }
+        bool isActive() const { return _isActive; }
+        QString expr() const { return _expr; }
+        
+        // Property setters.
+        void setName(QString s) { setObjectName(s.trimmed()); }
+        void setIsActive(bool b) { _isActive = b; }
+        void setExpr(QString s) { _expr = s; }
+        
+    protected:
+        // Properties.
+        bool _isActive;
+        QString _expr;
+    };
+    
+    /* --------------------------------------------------------------------------------
+     * -------------------------------------------------------------------------------- */
+    class SimulationsSummary : public QObject
+    {
+        Q_OBJECT
+        Q_PROPERTY(QString Name READ name WRITE setName)
+        Q_PROPERTY(bool Active READ isActive WRITE setIsActive)
+        Q_PROPERTY(QString ExprX READ exprX WRITE setExprX)
+        Q_PROPERTY(QString ExprY READ exprY WRITE setExprY)
+        Q_PROPERTY(QString StartX READ startX WRITE setStartX)
+        Q_PROPERTY(QString DurationX READ durationX WRITE setDurationX)
+        Q_PROPERTY(QString StartY READ startY WRITE setStartY)
+        Q_PROPERTY(QString DurationY READ durationY WRITE setDurationY)
+        Q_PROPERTY(Normalization Normalization READ normalization WRITE setNormalization)
+        
+    public:
+        enum Normalization { None, PerRow, AllRows };
+        Q_ENUMS(Normalization);
+        
+        typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RowMajorMatrixXd;
+        typedef Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RowMajorMatrixXi;
+        
+        // Default constructor.
+        SimulationsSummary(QObject *parent = 0, const QString &name = "") :
+        QObject(parent), _isActive(true), _normalization(None) { setName(name); }
+        
+        // Property getters.
+        QString name() const { return objectName(); }
+        bool isActive() const { return _isActive; }
+        QString exprX() const { return _exprX; }
+        QString exprY() const { return _exprY; }
+        QString startX() const { return _startX; }
+        QString durationX() const { return _durationX; }
+        QString startY() const { return _startY; }
+        QString durationY() const { return _durationY; }
+        Normalization normalization() const { return _normalization; }
+        
+        // Property setters.
+        void setName(QString s) { setObjectName(s.trimmed()); }
+        void setIsActive(bool b) { _isActive = b; }
+        void setExprX(QString s) { _exprX = s; }
+        void setExprY(QString s) { _exprY = s; }
+        void setStartX(QString s) { _startX = s; }
+        void setDurationX(QString s) { _durationX = s; }
+        void setStartY(QString s) { _startY = s; }
+        void setDurationY(QString s) { _durationY = s; }
+        void setNormalization(Normalization i) { _normalization = i; }
+        
+        // Conditions matrices.
+        std::vector<std::vector<std::string> > exprXs;
+        std::vector<std::vector<std::string> > exprYs;
+        std::vector<std::vector<double> > startXs;
+        std::vector<std::vector<double> > durationXs;
+        std::vector<std::vector<double> > startYs;
+        std::vector<std::vector<double> > durationYs;
+        
+        // Indexes.
+        RowMajorMatrixXi firstPtX;
+        RowMajorMatrixXi numPtsX;
+        RowMajorMatrixXi firstPtY;
+        RowMajorMatrixXi numPtsY;
+        
+        // Summary.
+        std::vector<RowMajorMatrixXd> dataX;
+        std::vector<RowMajorMatrixXd> dataY;
+        
+    protected:
+        // Properties.
+        bool _isActive;
+        QString _exprX;
+        QString _exprY;
+        QString _startX;
+        QString _durationX;
+        QString _startY;
+        QString _durationY;
+        Normalization _normalization;
     };
     
     /* --------------------------------------------------------------------------------
@@ -233,6 +341,7 @@ namespace StimulusClampProtocol
         
         // Matrix of simulations (one for each set of conditions).
         std::vector<std::vector<Simulation> > simulations;
+        QStringList stateNames;
         
         // Default constructor.
         StimulusClampProtocol(QObject *parent = 0, const QString &name = "");
@@ -261,9 +370,6 @@ namespace StimulusClampProtocol
         std::vector<std::vector<double> > sampleIntervals;
         std::vector<std::vector<double> > weights;
         
-        // Delete all protocol objects.
-        void clear();
-        
         // Initialize prior to running a simulation.
         void init(std::vector<Epoch*> &uniqueEpochs);
         
@@ -274,6 +380,13 @@ namespace StimulusClampProtocol
         void dump(std::ostream &out = std::cout);
 #endif
         
+    public slots:
+        void clear();
+        void open(QString filePath = "");
+        void save();
+        void saveAs(QString filePath = "");
+        void saveMonteCarloEventChainsAsDwt(QString filePath = "");
+        
     protected:
         // Properties.
         QString _notes;
@@ -282,25 +395,56 @@ namespace StimulusClampProtocol
         QString _sampleInterval;
         QString _weight;
         bool _startEquilibrated;
+        
+        // File info.
+        QFileInfo _fileInfo;
     };
     
     /* --------------------------------------------------------------------------------
      * -------------------------------------------------------------------------------- */
-    struct StimulusClampProtocolSimulator
+    class StimulusClampProtocolSimulator
     {
+    public:
         MarkovModel::MarkovModel *model;
-        QStringList stateNames;
         std::vector<StimulusClampProtocol*> protocols;
-        std::vector<Epoch*> uniqueEpochs;
         QVariantMap options;
+        
+        QStringList stateNames;
+        std::vector<Epoch*> uniqueEpochs;
         AbortFlag abort;
         QString message;
         
-        StimulusClampProtocolSimulator() : model(0) {}
+        StimulusClampProtocolSimulator() : model(0), abort(false) {}
         ~StimulusClampProtocolSimulator() { for(Epoch *epoch : uniqueEpochs) delete epoch; }
         
         void init();
         void run();
+    };
+    
+    /* --------------------------------------------------------------------------------
+     * -------------------------------------------------------------------------------- */
+    class StimulusClampProtocolSimulatorDialog : public QProgressDialog, public StimulusClampProtocolSimulator
+    {
+        Q_OBJECT
+        
+    public:
+        StimulusClampProtocolSimulatorDialog(const QString &labelText = "", QWidget *parent = 0);
+        
+        void simulate();
+        
+    signals:
+        void aborted();
+        void finished();
+        
+    protected slots:
+        void _abort();
+        void _finish();
+        
+    protected:
+        QFuture<void> _future;
+        QFutureWatcher<void> _watcher;
+        
+        void closeEvent(QCloseEvent *event) { _abort(); event->accept(); }
     };
     
     /* --------------------------------------------------------------------------------
@@ -309,66 +453,64 @@ namespace StimulusClampProtocol
      * !!! Currently all value conversion failures are ignored.
      * -------------------------------------------------------------------------------- */
     template <typename T>
-    std::vector<T> str2vec(const QString &str, const QString &delimiter = ",", const QString &rangeDelimiter = ":")
+    std::vector<T> str2vec(const QString &str, const QString &delimiterRegex = "[,\\s]\\s*", const QString &rangeDelimiterRegex = ":")
     {
         std::vector<T> vec;
         std::istringstream iss;
         T value;
-        QStringList fields = str.split(delimiter, QString::SkipEmptyParts);
+        QStringList fields = str.split(QRegularExpression(delimiterRegex), QString::SkipEmptyParts);
         vec.reserve(fields.size());
         foreach(QString field, fields) {
             field = field.trimmed();
             if(!field.isEmpty()) {
-                if(field.contains(rangeDelimiter)) { // Value range.
-                    QStringList subfields = field.split(rangeDelimiter, QString::SkipEmptyParts);
-                    if(subfields.size() == 2) { // start:stop
-                        T start;
-                        iss.clear();
-                        iss.str(subfields[0].toStdString());
-                        iss >> start;
-                        if(!iss.fail() && !iss.bad() && iss.eof()) {
-                            T stop;
-                            iss.clear();
-                            iss.str(subfields[1].toStdString());
-                            iss >> stop;
-                            if(!iss.fail() && !iss.bad() && iss.eof()) {
-                                for(value = start; value <= stop; value += 1)
-                                    vec.push_back(value);
-                            }
-                        }
-                    } else if(subfields.size() == 3) { // start:step:stop
-                        T start;
-                        iss.clear();
-                        iss.str(subfields[0].toStdString());
-                        iss >> start;
-                        if(!iss.fail() && !iss.bad() && iss.eof()) {
-                            T step;
-                            iss.clear();
-                            iss.str(subfields[1].toStdString());
-                            iss >> step;
-                            if(!iss.fail() && !iss.bad() && iss.eof()) {
-                                T stop;
-                                iss.clear();
-                                iss.str(subfields[2].toStdString());
-                                iss >> stop;
-                                if(!iss.fail() && !iss.bad() && iss.eof()) {
-                                    if(step > 0) {
-                                        for(value = start; value <= stop; value += step)
-                                            vec.push_back(value);
-                                    } else if(step < 0) {
-                                        for(value = start; value >= stop; value += step)
-                                            vec.push_back(value);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else { // Single value.
+                QStringList subfields = field.split(QRegularExpression(rangeDelimiterRegex), QString::SkipEmptyParts);
+                if(subfields.size() == 1) { // single value
                     iss.clear();
                     iss.str(field.toStdString());
                     iss >> value;
                     if(!iss.fail() && !iss.bad() && iss.eof())
                         vec.push_back(value);
+                } else if(subfields.size() == 2) { // start:stop
+                    T start;
+                    iss.clear();
+                    iss.str(subfields[0].toStdString());
+                    iss >> start;
+                    if(!iss.fail() && !iss.bad() && iss.eof()) {
+                        T stop;
+                        iss.clear();
+                        iss.str(subfields[1].toStdString());
+                        iss >> stop;
+                        if(!iss.fail() && !iss.bad() && iss.eof()) {
+                            for(value = start; value <= stop; value += 1)
+                                vec.push_back(value);
+                        }
+                    }
+                } else if(subfields.size() == 3) { // start:step:stop
+                    T start;
+                    iss.clear();
+                    iss.str(subfields[0].toStdString());
+                    iss >> start;
+                    if(!iss.fail() && !iss.bad() && iss.eof()) {
+                        T step;
+                        iss.clear();
+                        iss.str(subfields[1].toStdString());
+                        iss >> step;
+                        if(!iss.fail() && !iss.bad() && iss.eof()) {
+                            T stop;
+                            iss.clear();
+                            iss.str(subfields[2].toStdString());
+                            iss >> stop;
+                            if(!iss.fail() && !iss.bad() && iss.eof()) {
+                                if(step > 0) {
+                                    for(value = start; value <= stop; value += step)
+                                        vec.push_back(value);
+                                } else if(step < 0) {
+                                    for(value = start; value >= stop; value += step)
+                                        vec.push_back(value);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -376,21 +518,21 @@ namespace StimulusClampProtocol
     }
     // Specialization for strings because ranges don't make sense for strings.
     template <>
-    std::vector<std::string> str2vec<std::string>(const QString &str, const QString &delimiter, const QString &rangeDelimiter);
+    std::vector<std::string> str2vec<std::string>(const QString &str, const QString &delimiterRegex, const QString &rangeDelimiterRegex);
     
     /* --------------------------------------------------------------------------------
      * Parse string rep of 2D matrix.
      * -------------------------------------------------------------------------------- */
     template <typename T>
-    std::vector<std::vector<T> > str2mat(const QString &str, const QString &rowDelimiter = ";", const QString &columnDelimiter = ",", const QString &rangeDelimiter = ":")
+    std::vector<std::vector<T> > str2mat(const QString &str, const QString &rowDelimiterRegex = ";", const QString &columnDelimiterRegex = "[,\\s]\\s*", const QString &rangeDelimiterRegex = ":")
     {
         std::vector<std::vector<T> > mat;
-        QStringList rows = str.split(rowDelimiter, QString::SkipEmptyParts);
+        QStringList rows = str.split(QRegularExpression(rowDelimiterRegex), QString::SkipEmptyParts);
         mat.reserve(rows.size());
         foreach(QString row, rows) {
             row = row.trimmed();
             if(!row.isEmpty()) {
-                std::vector<T> vec = str2vec<T>(row, columnDelimiter, rangeDelimiter);
+                std::vector<T> vec = str2vec<T>(row, columnDelimiterRegex, rangeDelimiterRegex);
                 if(!vec.empty())
                     mat.push_back(vec);
             }

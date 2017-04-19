@@ -94,7 +94,7 @@ namespace MarkovModel
         QColor selectedConnectionTextColor() const { return _selectedConnectionTextColor; }
         
         // Property setters.
-        void setModel(MarkovModel* model) { _model = model; repaint(); }
+        void setModel(MarkovModel* model);
         void setIsEvalExprs(bool b) { _isEvalExprs = b; }
         void setExprStimuli(QString s) { _exprStimuli = s; }
         void setVariableSetIndex(int i) { _variableSetIndex = i; }

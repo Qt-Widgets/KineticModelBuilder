@@ -308,6 +308,7 @@ namespace QObjectPropertyEditor
         endInsertRows();
         if(row + count < _objects.size())
             reorderChildObjectsToMatchRowOrder(row + count);
+        emit rowCountChanged();
         return true;
     }
     
@@ -319,6 +320,7 @@ namespace QObjectPropertyEditor
         QObjectList::iterator begin = _objects.begin() + row;
         _objects.erase(begin, begin + count);
         endRemoveRows();
+        emit rowCountChanged();
         return true;
     }
     
@@ -336,6 +338,7 @@ namespace QObjectPropertyEditor
         }
         endResetModel();
         reorderChildObjectsToMatchRowOrder(sourceRow <= destinationRow ? sourceRow : destinationRow);
+        emit rowOrderChanged();
         return true;
     }
     

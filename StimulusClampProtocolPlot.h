@@ -58,7 +58,9 @@ namespace StimulusClampProtocol
         Q_PROPERTY(QString VisibleVariableSets READ visibleVariableSetIndexes WRITE setVisibleVariableSetIndexes NOTIFY optionsChanged)
         Q_PROPERTY(QString VisibleRows READ visibleRows WRITE setVisibleRows NOTIFY optionsChanged)
         Q_PROPERTY(QString VisibleColumns READ visibleColumns WRITE setVisibleColumns NOTIFY optionsChanged)
-        Q_PROPERTY(bool showReferenceData READ showReferenceData WRITE setShowReferenceData NOTIFY optionsChanged)
+        Q_PROPERTY(QString VisibleEventChains READ visibleEventChains WRITE setVisibleEventChains NOTIFY optionsChanged)
+        Q_PROPERTY(bool ShowMonteCarloEventChains READ showEventChains WRITE setShowEventChains NOTIFY optionsChanged)
+        Q_PROPERTY(bool ShowReferenceData READ showReferenceData WRITE setShowReferenceData NOTIFY optionsChanged)
         Q_PROPERTY(bool LogScaleX READ isLogScaleX WRITE setIsLogScaleX NOTIFY optionsChanged)
         Q_PROPERTY(bool LogScaleYLeft READ isLogScaleYLeft WRITE setIsLogScaleYLeft NOTIFY optionsChanged)
         Q_PROPERTY(bool LogScaleYRight READ isLogScaleYRight WRITE setIsLogScaleYRight NOTIFY optionsChanged)
@@ -70,11 +72,14 @@ namespace StimulusClampProtocol
         StimulusClampProtocolPlot(QWidget *parent = 0);
         
         // Property getters.
+        StimulusClampProtocol* protocol() const { return _protocol; }
         QString visibleSignalsYLeft() { return _visibleSignalsYLeft; }
         QString visibleSignalsYRight() { return _visibleSignalsYRight; }
         QString visibleVariableSetIndexes() { return _visibleVariableSetIndexes; }
         QString visibleRows() { return _visibleRows; }
         QString visibleColumns() { return _visibleColumns; }
+        QString visibleEventChains() { return _visibleEventChains; }
+        bool showEventChains() { return _showEventChains; }
         bool showReferenceData() { return _showReferenceData; }
         bool isLogScaleX() { return _isLogScaleX; }
         bool isLogScaleYLeft() { return _isLogScaleYLeft; }
@@ -84,26 +89,24 @@ namespace StimulusClampProtocol
         QColor referenceDataColor() { return _referenceDataColor; }
         
         // Property setters.
-        void setVisibleSignalsYLeft(QString s) { _visibleSignalsYLeft = s; }
-        void setVisibleSignalsYRight(QString s) { _visibleSignalsYRight = s; }
-        void setVisibleVariableSetIndexes(QString s) { _visibleVariableSetIndexes = s; }
-        void setVisibleRows(QString s) { _visibleRows = s; }
-        void setVisibleColumns(QString s) { _visibleColumns = s; }
-        void setShowReferenceData(bool b) { _showReferenceData = b; }
-        void setIsLogScaleX(bool b) { _isLogScaleX = b; }
-        void setIsLogScaleYLeft(bool b) { _isLogScaleYLeft = b; }
-        void setIsLogScaleYRight(bool b) { _isLogScaleYRight = b; }
-        void setLineWidth(int w) { _lineWidth = w; }
-        void setMarkerSize(int w) { _markerSize = w; }
-        void setReferenceDataColor(QColor color) { _referenceDataColor = color; }
-        
-        // Plotting.
-        void clearPlot();
-        void plotProtocol(StimulusClampProtocol *protocol, const QStringList &stateNames = QStringList());
-        QwtPlotCurve* addCurve(int yAxis, const QString &xTitle, const QString &yTitle, double *x, double *y, int npts, const QColor &color, QwtPlotCurve::CurveStyle style);
+        void setProtocol(StimulusClampProtocol *protocol) { _protocol = protocol; }
+        void setVisibleSignalsYLeft(QString s) { _visibleSignalsYLeft = s; emit optionsChanged(); }
+        void setVisibleSignalsYRight(QString s) { _visibleSignalsYRight = s; emit optionsChanged(); }
+        void setVisibleVariableSetIndexes(QString s) { _visibleVariableSetIndexes = s; emit optionsChanged(); }
+        void setVisibleRows(QString s) { _visibleRows = s; emit optionsChanged(); }
+        void setVisibleColumns(QString s) { _visibleColumns = s; emit optionsChanged(); }
+        void setVisibleEventChains(QString s) { _visibleEventChains = s; emit optionsChanged(); }
+        void setShowEventChains(bool b) { _showEventChains = b; emit optionsChanged(); }
+        void setShowReferenceData(bool b) { _showReferenceData = b; emit optionsChanged(); }
+        void setIsLogScaleX(bool b) { _isLogScaleX = b; emit optionsChanged(); }
+        void setIsLogScaleYLeft(bool b) { _isLogScaleYLeft = b; emit optionsChanged(); }
+        void setIsLogScaleYRight(bool b) { _isLogScaleYRight = b; emit optionsChanged(); }
+        void setLineWidth(int w) { _lineWidth = w; emit optionsChanged(); }
+        void setMarkerSize(int w) { _markerSize = w; emit optionsChanged(); }
+        void setReferenceDataColor(QColor color) { _referenceDataColor = color; emit optionsChanged(); }
         
         // Default minimum size hint is too big, so we'll redefine it here.
-        QSize minimumSizeHint() const { return QSize(50, 50); }
+        QSize minimumSizeHint() const { return QSize(30, 30); }
         
         // Command menu.
         QMenu* getMenu();
@@ -112,6 +115,8 @@ namespace StimulusClampProtocol
         void optionsChanged();
         
     public slots:
+        void clearPlot();
+        void plotProtocol();
         void autoscale();
         void editOptions();
         void exportVisibleToText();
@@ -119,15 +124,19 @@ namespace StimulusClampProtocol
         void exportMonteCarloEventChainsToDwt();
         
     protected:
+        QwtPlotCurve* addCurve(int yAxis, const QString &xTitle, const QString &yPostFix, const QString &yTitle, double *x, double *y, int npts, const QColor &color, QwtPlotCurve::CurveStyle style, bool isRawData = true);
         void mouseReleaseEvent(QMouseEvent *event);
         
     protected:
         // Properties.
+        StimulusClampProtocol *_protocol;
         QString _visibleSignalsYLeft;
         QString _visibleSignalsYRight;
         QString _visibleVariableSetIndexes;
         QString _visibleRows;
         QString _visibleColumns;
+        QString _visibleEventChains;
+        bool _showEventChains;
         bool _showReferenceData;
         bool _isLogScaleX;
         bool _isLogScaleYLeft;
