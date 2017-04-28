@@ -14,9 +14,12 @@
 #include <qwt_symbol.h>
 #include <QDialog>
 #include <QFileDialog>
+#include <QLabel>
 #include <QMenu>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QVBoxLayout>
+#include <QWidgetAction>
 
 namespace StimulusClampProtocol
 {
@@ -90,7 +93,25 @@ namespace StimulusClampProtocol
     
     QMenu* StimulusClampProtocolPlot::getMenu()
     {
+        
+        QWidget *ui = new QWidget();
+        QLineEdit *visLeftEdit = new QLineEdit(visibleSignalsYLeft());
+        QLineEdit *visRightEdit = new QLineEdit(visibleSignalsYRight());
+        connect(visLeftEdit, SIGNAL(textEdited(QString)), this, SLOT(_setVisibleSignalsYLeft(QString)));
+        connect(visRightEdit, SIGNAL(textEdited(QString)), this, SLOT(_setVisibleSignalsYRight(QString)));
+        QGridLayout *grid = new QGridLayout(ui);
+        grid->setContentsMargins(5, 1, 5, 1);
+        grid->setSpacing(1);
+        grid->addWidget(new QLabel("Y Axis Left"), 0, 0);
+        grid->addWidget(visLeftEdit, 0, 1);
+        grid->addWidget(new QLabel("Y Axis Right"), 1, 0);
+        grid->addWidget(visRightEdit, 1, 1);
+        QWidgetAction *uiAction = new QWidgetAction(0);
+        uiAction->setDefaultWidget(ui);
+        
         QMenu *menu = new QMenu();
+        menu->addAction(uiAction);
+        menu->addSeparator();
         menu->addAction("Plot Options", this, SLOT(editOptions()));
         menu->addSeparator();
         menu->addAction("Export Visible (.txt)", this, SLOT(exportVisibleToText()));
@@ -171,16 +192,13 @@ namespace StimulusClampProtocol
                         for(size_t col : visCols) {
                             if(col < _protocol->simulations[row].size()) {
                                 Simulation &sim = _protocol->simulations[row][col];
-                                bool hasProbability = sim.probability.size() > varSet;
-                                bool hasWaveforms = sim.waveforms.size() > varSet;
-                                bool hasEventChains = sim.events.size() > varSet;
                                 QString postfix = rowPostfix;
                                 if(cols > 1) {
                                     postfix.chop(2);
                                     postfix += QString::number(col) + ")";
                                 }
                                 if(yAxis == QwtPlot::yLeft && _showEventChains) {
-                                    if(hasEventChains) {
+                                    if(sim.events.size() > varSet) {
                                         const std::vector<MonteCarloEventChain> &eventChains = sim.events.at(varSet);
                                         std::vector<size_t> chainIndexes = visChains;
                                         if(chainIndexes.empty()) {
@@ -213,14 +231,22 @@ namespace StimulusClampProtocol
                                                 }
                                                 addCurve(yAxis, "Time (s)", "State", chainsPostfix, eventTimes.data(), eventStates.data(), eventTimes.size(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Steps, false);
                                             }
-                                        }
+                                        } // visChain
                                     }
                                 } else if(visSignals.empty()) {
                                     // Plot probability in each state.
-                                    if(hasProbability) {
+                                    if(sim.probability.size() > varSet) {
                                         Eigen::MatrixXd &probability = sim.probability.at(varSet);
                                         for(int i = 0; i < probability.cols(); ++i) {
-                                            addCurve(yAxis, "Time (s)", _protocol->stateNames.at(i), postfix, sim.time.data(), probability.col(i).data(), sim.time.size(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
+                                            QString stateName = _protocol->stateNames.at(i);
+                                            if(_showReferenceData && sim.referenceData.size() > varSet) {
+                                                std::map<QString, Simulation::RefData>::iterator refIter = sim.referenceData.at(varSet).find(stateName);
+                                                if(refIter != sim.referenceData.at(varSet).end()) {
+                                                    Simulation::RefData &refData = refIter->second;
+                                                    addCurve(yAxis, "Time (s)", "Ref " + stateName, postfix, sim.time.data() + refData.firstPt, refData.waveform.data(), refData.numPts, _referenceDataColor, QwtPlotCurve::Lines);
+                                                }
+                                            }
+                                            addCurve(yAxis, "Time (s)", stateName, postfix, sim.time.data(), probability.col(i).data(), sim.time.size(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
                                         }
                                     }
                                     setAxisTitle(QwtPlot::xBottom, "Time (s)");
@@ -235,45 +261,39 @@ namespace StimulusClampProtocol
                                             Eigen::VectorXd mask = sim.mask.cast<double>();
                                             addCurve(yAxis, "Time (s)", "Mask", postfix, sim.time.data(), mask.data(), sim.time.size(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
                                         } else {
-                                            int stateIndex = _protocol->stateNames.indexOf(visSig);
-                                            if(stateIndex != -1) {
-                                                if(hasProbability) {
-                                                    Eigen::MatrixXd &probability = sim.probability.at(varSet);
-                                                    addCurve(yAxis, "Time (s)", visSig, postfix, sim.time.data(), probability.col(stateIndex).data(), sim.time.size(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
+                                            double *x = 0;
+                                            double *y = 0;
+                                            int n = 0;
+                                            _protocol->getSimulationWaveform(visSig, sim, varSet, &x, &y, &n);
+                                            if(x && y && n > 0) {
+                                                if(_showReferenceData) {
+                                                    double *xref = 0;
+                                                    double *yref = 0;
+                                                    int nref = 0;
+                                                    _protocol->getSimulationRefWaveform(visSig, sim, varSet, &xref, &yref, &nref);
+                                                    if(xref && yref && nref > 0) {
+                                                        addCurve(yAxis, "Time (s)", "Ref " + visSig, postfix, xref, yref, nref, _referenceDataColor, QwtPlotCurve::Lines);
+                                                    }
                                                 }
-                                            } else {
-                                                auto it = sim.stimuli.find(visSig);
-                                                if(it != sim.stimuli.end()) {
-                                                    addCurve(yAxis, "Time (s)", visSig, postfix, sim.time.data(), it->second.data(), sim.time.size(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
-                                                } else {
-                                                    bool isWaveform = false;
-                                                    if(hasWaveforms) {
-                                                        std::map<QString, Eigen::VectorXd> &waveforms = sim.waveforms.at(varSet);
-                                                        it = waveforms.find(visSig);
-                                                        if(it != waveforms.end()) {
-                                                            addCurve(yAxis, "Time (s)", visSig, postfix, sim.time.data(), it->second.data(), sim.time.size(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
-                                                            isWaveform = true;
+                                                addCurve(yAxis, "Time (s)", visSig, postfix, x, y, n, _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
+                                            } else if(col == visCols.at(0)) {
+                                                _protocol->getSummaryWaveform(visSig, varSet, row, &x, &y, &n);
+                                                if(x && y && n > 0) {
+                                                    if(_showReferenceData) {
+                                                        double *xref = 0;
+                                                        double *yref = 0;
+                                                        int nref = 0;
+                                                        _protocol->getSummaryRefWaveform(visSig, varSet, row, &xref, &yref, &nref);
+                                                        if(xref && yref && nref > 0) {
+                                                            addCurve(yAxis, "Time (s)", "Ref " + visSig, postfix, xref, yref, nref, _referenceDataColor, QwtPlotCurve::Lines);
                                                         }
                                                     }
-                                                    if(!isWaveform) {
-                                                        if(col == visCols.at(0)) {
-                                                            foreach(SimulationsSummary *summary, summaries) {
-                                                                if(summary->isActive() && summary->name() == visSig) {
-                                                                    if(summary->dataX.size() > varSet && summary->dataY.size() > varSet) {
-                                                                        SimulationsSummary::RowMajorMatrixXd &dataX = summary->dataX.at(varSet);
-                                                                        SimulationsSummary::RowMajorMatrixXd &dataY = summary->dataY.at(varSet);
-                                                                        addCurve(yAxis, summary->exprX(), visSig, rowPostfix, dataX.row(row).data(), dataY.row(row).data(), dataX.cols(), _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
-                                                                        break;
-                                                                    }
-                                                                } // isActive
-                                                            } // summary
-                                                        } // first visible col
-                                                    } // !isWaveform
-                                                } // not a stimulus
-                                            } // not a state
-                                        } // not weight or mask
+                                                    addCurve(yAxis, "Time (s)", visSig, postfix, x, y, n, _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
+                                                }
+                                            }
+                                        }
                                     } // visSignal
-                                } // visSignals not empty
+                                }
                             }
                         } // col
                     }
@@ -344,7 +364,49 @@ namespace StimulusClampProtocol
 
     void StimulusClampProtocolPlot::exportVisibleToText()
     {
-        // ... TODO
+        QString filePath = QFileDialog::getSaveFileName(this, "Export visible plots to column data *.txt file.");
+        if(filePath.size() == 0)
+            return;
+        if(_curves.size() == 0) {
+            QString messageTitle = "Export warning.";
+            QString message = "No simulations are displayed on this plot. Only displayed simulations are exported.\r\n";
+            QMessageBox::information(this, messageTitle, message);
+            return;
+        }
+        QFile file(filePath);
+        if(!file.open(QIODevice::Text | QIODevice::WriteOnly))
+            return;
+        QTextStream out(&file);
+        // Curves of the same size.
+        std::vector<size_t> curveIndexes;
+        curveIndexes.reserve(_curves.size());
+        curveIndexes.push_back(0);
+        size_t numPts = _curves[0]->dataSize();
+        for(size_t i = 1; i < _curves.size(); ++i) {
+            if(_curves[i]->dataSize() == numPts)
+                curveIndexes.push_back(i);
+        }
+        // Titles.
+        for(size_t i : curveIndexes)
+            out << (i == curveIndexes[0] ? "" : "\t") << _curveTitlesXY[i].first << "\t" << _curveTitlesXY[i].second;
+        out << "\r\n";
+        // Data.
+        for(size_t row = 0; row < numPts; ++row) {
+            for(size_t i : curveIndexes){
+                QwtPlotCurve *curve = _curves[i];
+                out << (i == curveIndexes[0] ? "" : "\t") << curve->sample(row).x() << "\t" << curve->sample(row).y();
+            }
+            out << "\r\n";
+        }
+        file.close();
+        // If not everything was exported due to different length arrays.
+        if(curveIndexes.size() != _curves.size()) {
+            QString messageTitle = "Export warning.";
+            QString message = QString::number(curveIndexes.size()) + " of " + QString::number(_curves.size()) + " visible plots exported.\r\n";
+            message = message + "Remaining plots not exported as they contain a different number of sample points.\r\n";
+            message = message + "To export all plots, only display plots with equal sample sizes.\r\n";
+            QMessageBox::information(this, messageTitle, message);
+        }
     }
 
     void StimulusClampProtocolPlot::exportVisibleToSvg()

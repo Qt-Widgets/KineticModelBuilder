@@ -1,4 +1,3 @@
-- StimulusClampProtocol reference data.
 - Model optimization.
 - StimulusClampProtocolPlot::exportVisibleToText()
 - Auto generate waveform for charge current.

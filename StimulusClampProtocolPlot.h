@@ -123,6 +123,10 @@ namespace StimulusClampProtocol
         void exportVisibleToSvg();
         void exportMonteCarloEventChainsToDwt();
         
+    protected slots:
+        void _setVisibleSignalsYLeft(QString s) { setVisibleSignalsYLeft(s); }
+        void _setVisibleSignalsYRight(QString s) { setVisibleSignalsYRight(s); }
+        
     protected:
         QwtPlotCurve* addCurve(int yAxis, const QString &xTitle, const QString &yPostFix, const QString &yTitle, double *x, double *y, int npts, const QColor &color, QwtPlotCurve::CurveStyle style, bool isRawData = true);
         void mouseReleaseEvent(QMouseEvent *event);

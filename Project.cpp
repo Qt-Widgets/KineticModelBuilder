@@ -21,6 +21,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QStatusBar>
 #include <QTextStream>
 #include <QVBoxLayout>
 
@@ -40,6 +41,7 @@ namespace KineticModelBuilder
         factory.registerCreator("StimulusClampProtocol::Stimulus", factory.defaultCreator<StimulusClampProtocol::Stimulus>);
         factory.registerCreator("StimulusClampProtocol::Waveform", factory.defaultCreator<StimulusClampProtocol::Waveform>);
         factory.registerCreator("StimulusClampProtocol::SimulationsSummary", factory.defaultCreator<StimulusClampProtocol::SimulationsSummary>);
+        factory.registerCreator("StimulusClampProtocol::ReferenceData", factory.defaultCreator<StimulusClampProtocol::ReferenceData>);
         return factory;
     }
     QObjectPropertyTreeSerializer::ObjectFactory Project::objectFactory = getObjectFactory();
@@ -145,10 +147,12 @@ namespace KineticModelBuilder
                 _newObjectWithUI<StimulusClampProtocol::StimulusClampProtocol, StimulusClampProtocol::StimulusClampProtocolWindow>(data["StimulusClampProtocol::StimulusClampProtocol"].toMap());
             }
         }
-        bool temp = _autoTileWindows;
-        _autoTileWindows = false;
-        qDeleteAll(oldWindows);
-        _autoTileWindows = temp;
+        if(data.size() > 1) {
+            bool temp = _autoTileWindows;
+            _autoTileWindows = false;
+            qDeleteAll(oldWindows);
+            _autoTileWindows = temp;
+        }
         if(_autoTileWindows)
             tileWindows();
     }
@@ -368,11 +372,12 @@ namespace KineticModelBuilder
         }
         
         // StimulusClampProtocols.
-        StimulusClampProtocol::StimulusClampProtocolSimulatorDialog *stimulusClampProtocolSimulator = new StimulusClampProtocol::StimulusClampProtocolSimulatorDialog("Simulating " + model->name() + "...");
+        StimulusClampProtocol::StimulusClampProtocolSimulator *stimulusClampProtocolSimulator = new StimulusClampProtocol::StimulusClampProtocolSimulator("Simulating " + model->name() + "...");
         foreach(QWidget *widget, QApplication::topLevelWidgets()) {
             if(StimulusClampProtocol::StimulusClampProtocolWindow *window = qobject_cast<StimulusClampProtocol::StimulusClampProtocolWindow*>(widget)) {
                 stimulusClampProtocolSimulator->protocols.push_back(window->protocol());
                 connect(stimulusClampProtocolSimulator, SIGNAL(finished()), window, SLOT(replot()));
+                connect(stimulusClampProtocolSimulator, SIGNAL(finished()), window, SLOT(showMaxProbabilityError()));
             }
         }
         if(stimulusClampProtocolSimulator->protocols.size()) {
@@ -387,6 +392,7 @@ namespace KineticModelBuilder
             }
             ++_busyLevel;
             connect(stimulusClampProtocolSimulator, SIGNAL(finished()), this, SLOT(simulationFinished()));
+            _timer.start();
             stimulusClampProtocolSimulator->simulate(); // Will delete itself when simulation is done.
         } else {
             delete stimulusClampProtocolSimulator;
@@ -413,7 +419,32 @@ namespace KineticModelBuilder
             return;
         }
         
-        // ... TODO
+        // StimulusClampProtocols.
+        StimulusClampProtocol::StimulusClampProtocolSimulator *stimulusClampProtocolSimulator = new StimulusClampProtocol::StimulusClampProtocolSimulator("Simulating " + model->name() + "...");
+        foreach(QWidget *widget, QApplication::topLevelWidgets()) {
+            if(StimulusClampProtocol::StimulusClampProtocolWindow *window = qobject_cast<StimulusClampProtocol::StimulusClampProtocolWindow*>(widget)) {
+                stimulusClampProtocolSimulator->protocols.push_back(window->protocol());
+                connect(stimulusClampProtocolSimulator, SIGNAL(finished()), window, SLOT(replot()));
+                connect(stimulusClampProtocolSimulator, SIGNAL(finished()), window, SLOT(showMaxProbabilityError()));
+            }
+        }
+        if(stimulusClampProtocolSimulator->protocols.size()) {
+            stimulusClampProtocolSimulator->model = model;
+            if(_simulationMethod == EigenSolver) {
+                stimulusClampProtocolSimulator->options["Method"] = "Eigen Solver";
+            } else if(_simulationMethod == MonteCarlo) {
+                stimulusClampProtocolSimulator->options["Method"] = "Monte Carlo";
+                stimulusClampProtocolSimulator->options["# Monte Carlo runs"] = _numMonteCarloRuns;
+                stimulusClampProtocolSimulator->options["Accumulate Monte Carlo runs"] = _accumulateMonteCarloRuns;
+                stimulusClampProtocolSimulator->options["Sample probability from Monte Carlo event chains"] = _sampleProbabilityFromMonteCarloEventChains;
+            }
+            ++_busyLevel;
+            connect(stimulusClampProtocolSimulator, SIGNAL(finished()), this, SLOT(simulationFinished()));
+            _timer.start();
+            stimulusClampProtocolSimulator->optimize(_numOptimizationIterations); // Will delete itself when simulation is done.
+        } else {
+            delete stimulusClampProtocolSimulator;
+        }
         
         --_busyLevel;
     }
@@ -422,6 +453,9 @@ namespace KineticModelBuilder
     {
         --_busyLevel;
         if(_busyLevel == 0) {
+            if(MarkovModel::MarkovModelWindow *modelWindow = qobject_cast<MarkovModel::MarkovModelWindow*>(QApplication::activeWindow())) {
+                modelWindow->statusBar()->showMessage("Elapsed time: " + QString::number(_timer.elapsed() / 1000.0) + " sec");
+            }
         }
     }
 

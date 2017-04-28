@@ -12,6 +12,7 @@
 #include <QDialog>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QToolBar>
@@ -68,6 +69,8 @@ namespace StimulusClampProtocol
         // Protocol menu.
         QMenu *protocolMenu = new QMenu("Stimulus Clamp Protocol");
         protocolMenu->addAction("Protocol Parameters", this, SLOT(editProtocol()), QKeySequence::Italic);
+        protocolMenu->addSeparator();
+        protocolMenu->addAction("Simulation Cost", this, SLOT(showCost()));
         menuBar()->addMenu(protocolMenu);
         
         // Windows menu.
@@ -206,8 +209,7 @@ namespace StimulusClampProtocol
     
     void StimulusClampProtocolWindow::editProtocol()
     {
-        if(!_protocol)
-            return;
+        if(!_protocol) return;
         QDialog dialog(this);
         dialog.setModal(true);
         dialog.setWindowTitle("Protocol Parameters");
@@ -219,6 +221,31 @@ namespace StimulusClampProtocol
         QPoint topLeft = mapToGlobal(QPoint(0, 0));
         dialog.setGeometry(topLeft.x(), topLeft.y(), width(), height());
         dialog.exec();
+    }
+    
+    void StimulusClampProtocolWindow::showMaxProbabilityError()
+    {
+        if(!_protocol) return;
+        double Perror = 0;
+        for(size_t row = 0; row < _protocol->simulations.size(); ++row) {
+            for(size_t col = 0; col < _protocol->simulations[row].size(); ++col) {
+                Simulation &sim = _protocol->simulations[row][col];
+                double simPerror = sim.maxProbabilityError();
+                if(simPerror > Perror)
+                    Perror = simPerror;
+            }
+        }
+        statusBar()->showMessage("Perror <= " + QString::number(Perror));
+    }
+    
+    void StimulusClampProtocolWindow::showCost()
+    {
+        if(!_protocol) return;
+        double cost = _protocol->cost();
+//        statusBar()->showMessage("Cost = " + QString::number(cost));
+        QString messageTitle = "Protocol Cost";
+        QString message = "Cost for '" + _protocol->name() + "' = " + QString::number(cost);
+        QMessageBox::information(this, messageTitle, message);
     }
     
     void StimulusClampProtocolWindow::checkIfWeNeedToShowTheEventChainUi()

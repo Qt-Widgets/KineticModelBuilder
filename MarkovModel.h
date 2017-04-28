@@ -24,6 +24,7 @@
 
 #include <map>
 #include <vector>
+#include <QDir>
 #include <QFileInfo>
 #include <QObject>
 #include <QString>
@@ -437,10 +438,12 @@ namespace MarkovModel
         // Property getters.
         QString name() const { return objectName(); }
         QString notes() const { return _notes; }
+        QFileInfo fileInfo() const { return _fileInfo; }
         
         // Property setters.
         void setName(QString s) { setObjectName(s.trimmed()); }
         void setNotes(QString s) { _notes = s; }
+        void setFileInfo(const QFileInfo &fileInfo) { _fileInfo = fileInfo; }
         
         // Find model objects.
         Transition* findTransition(State *from, State *to);
@@ -486,8 +489,6 @@ namespace MarkovModel
     protected:
         // Properties.
         QString _notes;
-        
-        // File info.
         QFileInfo _fileInfo;
         
         // Math expression parser.

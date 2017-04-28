@@ -8,6 +8,8 @@
 #ifndef __StimulusClampProtocol_H__
 #define __StimulusClampProtocol_H__
 
+#include "MarkovModel.h"
+#include "QObjectPropertyTreeSerializer.h"
 #include <array>
 #include <atomic>
 #include <map>
@@ -16,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <QCloseEvent>
+#include <QDir>
 #include <QFileInfo>
 #include <QFuture>
 #include <QFutureWatcher>
@@ -26,8 +29,8 @@
 #include <QWidget>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
-#include "MarkovModel.h"
-#include "QObjectPropertyTreeSerializer.h"
+#include <gsl/gsl_multimin.h>
+#include <gsl/gsl_vector.h>
 #ifdef DEBUG
 #include <iostream>
 #include <QDebug>
@@ -79,7 +82,12 @@ namespace StimulusClampProtocol
     /* --------------------------------------------------------------------------------
      * Find sample indexes in range.
      * -------------------------------------------------------------------------------- */
-    void findIndexesInRange(const Eigen::VectorXd &time, double start, double stop, int *firstPt, int *numPts);
+    void findIndexesInRange(const Eigen::VectorXd &time, double start, double stop, int *firstPt, int *numPts, double epsilon = 0);
+    
+    /* --------------------------------------------------------------------------------
+     * Sample array data based on reference data.
+     * -------------------------------------------------------------------------------- */
+    void sampleArray(double *xref, double *yref, int nref, double *x, double *y, int n, int *firstPt, int *numPts, double x0, double epsilon = 0);
     
     /* --------------------------------------------------------------------------------
      * For dynamic object creation.
@@ -204,6 +212,16 @@ namespace StimulusClampProtocol
         std::vector<std::map<QString, Eigen::VectorXd> > waveforms;
         std::vector<std::vector<MonteCarloEventChain> > events;
         
+        // Reference data for each variable set.
+        struct RefData
+        {
+            Eigen::VectorXd waveform;
+            int firstPt;
+            int numPts;
+            double weight;
+        };
+        std::vector<std::map<QString, RefData> > referenceData;
+        
         // Random number generator.
         std::mt19937 randomNumberGenerator;
         
@@ -300,15 +318,25 @@ namespace StimulusClampProtocol
         std::vector<std::vector<double> > startYs;
         std::vector<std::vector<double> > durationYs;
         
-        // Indexes.
+        // Indexes into simulation arrays.
         RowMajorMatrixXi firstPtX;
         RowMajorMatrixXi numPtsX;
         RowMajorMatrixXi firstPtY;
         RowMajorMatrixXi numPtsY;
         
-        // Summary.
+        // Summaries for each variable set.
         std::vector<RowMajorMatrixXd> dataX;
         std::vector<RowMajorMatrixXd> dataY;
+        
+        // Reference data for each variable set and each row.
+        struct RefData
+        {
+            Eigen::RowVectorXd waveform;
+            int firstPt;
+            int numPts;
+            double weight;
+        };
+        std::vector<std::vector<RefData> > referenceData;
         
     protected:
         // Properties.
@@ -320,6 +348,72 @@ namespace StimulusClampProtocol
         QString _startY;
         QString _durationY;
         Normalization _normalization;
+    };
+    
+    /* --------------------------------------------------------------------------------
+     * -------------------------------------------------------------------------------- */
+    class ReferenceData : public QObject
+    {
+        Q_OBJECT
+        Q_PROPERTY(QString Name READ name WRITE setName)
+        Q_PROPERTY(QString FileName READ filePathRelativeToParentProtocol WRITE setFilePath)
+        Q_PROPERTY(int Set READ variableSetIndex WRITE setVariableSetIndex)
+        Q_PROPERTY(int Row READ rowIndex WRITE setRowIndex)
+        Q_PROPERTY(int Column READ columnIndex WRITE setColumnIndex)
+        Q_PROPERTY(double X0 READ x0 WRITE setX0)
+        Q_PROPERTY(Normalization Normalization READ normalization WRITE setNormalization)
+        Q_PROPERTY(double Scale READ scale WRITE setScale)
+        Q_PROPERTY(double Weight READ weight WRITE setWeight)
+        
+    public:
+        enum Normalization { None, ToMax, ToMin, ToAbsMinMax };
+        Q_ENUMS(Normalization);
+        
+        // Default constructor.
+        ReferenceData(QObject *parent = 0, const QString &name = "") :
+        QObject(parent), _variableSetIndex(0), _rowIndex(0), _columnIndex(0), _x0(0), _normalization(None), _scale(1), _weight(1) { setName(name); }
+        
+        // Property getters.
+        QString name() const { return objectName(); }
+        QString filePath() const { return _fileInfo.absoluteFilePath(); }
+        QString filePathRelativeToParentProtocol() const;
+        int variableSetIndex() const { return _variableSetIndex; }
+        int rowIndex() const { return _rowIndex; }
+        int columnIndex() const { return _columnIndex; }
+        double x0() const { return _x0; }
+        Normalization normalization() const { return _normalization; }
+        double scale() const { return _scale; }
+        double weight() const { return _weight; }
+        
+        // Property setters.
+        void setName(QString s) { setObjectName(s.trimmed()); }
+        void setFilePath(QString s) { open(s); }
+        void setVariableSetIndex(int i) { _variableSetIndex = i; }
+        void setRowIndex(int i) { _rowIndex = i; }
+        void setColumnIndex(int i) { _columnIndex = i; }
+        void setX0(double d) { _x0 = d; }
+        void setNormalization(Normalization i) { _normalization = i; }
+        void setScale(double d) { _scale = d; }
+        void setWeight(double d) { _weight = d; }
+        
+        QStringList columnTitles;
+        std::vector<Eigen::VectorXd> columnData;
+        std::vector<std::pair<int, int> > columnPairsXY;
+        
+    public slots:
+        void open(QString filePath);
+        void updateColumnPairsXY();
+        
+    protected:
+        // Properties.
+        QFileInfo _fileInfo;
+        int _variableSetIndex;
+        int _rowIndex;
+        int _columnIndex;
+        double _x0;
+        Normalization _normalization;
+        double _scale;
+        double _weight;
     };
     
     /* --------------------------------------------------------------------------------
@@ -354,6 +448,7 @@ namespace StimulusClampProtocol
         QString sampleInterval() const { return _sampleInterval; }
         QString weight() const { return _weight; }
         bool startEquilibrated() const { return _startEquilibrated; }
+        QFileInfo fileInfo() const { return _fileInfo; }
         
         // Property setters.
         void setName(QString s) { setObjectName(s.trimmed()); }
@@ -363,6 +458,7 @@ namespace StimulusClampProtocol
         void setSampleInterval(QString s) { _sampleInterval = s; }
         void setWeight(QString s) { _weight = s; }
         void setStartEquilibrated(bool b) { _startEquilibrated = b; }
+        void setFileInfo(const QFileInfo &fileInfo) { _fileInfo = fileInfo; }
         
         // Conditions matrices.
         std::vector<std::vector<double> > starts;
@@ -371,10 +467,16 @@ namespace StimulusClampProtocol
         std::vector<std::vector<double> > weights;
         
         // Initialize prior to running a simulation.
-        void init(std::vector<Epoch*> &uniqueEpochs);
+        void init(std::vector<Epoch*> &uniqueEpochs, const QStringList &stateNames);
         
         // Cost function.
         double cost();
+        
+        // Access simulation arrays.
+        void getSimulationWaveform(const QString &name, Simulation &sim, size_t variableSetIndex, double **x, double **y, int *n);
+        void getSimulationRefWaveform(const QString &name, Simulation &sim, size_t variableSetIndex, double **x, double **y, int *n);
+        void getSummaryWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n);
+        void getSummaryRefWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n);
         
 #ifdef DEBUG
         void dump(std::ostream &out = std::cout);
@@ -395,16 +497,18 @@ namespace StimulusClampProtocol
         QString _sampleInterval;
         QString _weight;
         bool _startEquilibrated;
-        
-        // File info.
         QFileInfo _fileInfo;
     };
     
     /* --------------------------------------------------------------------------------
      * -------------------------------------------------------------------------------- */
-    class StimulusClampProtocolSimulator
+    class StimulusClampProtocolSimulator : public QProgressDialog
     {
+        Q_OBJECT
+        
     public:
+        typedef double (*costFunction)(const gsl_vector *x, void *params);
+        
         MarkovModel::MarkovModel *model;
         std::vector<StimulusClampProtocol*> protocols;
         QVariantMap options;
@@ -414,23 +518,30 @@ namespace StimulusClampProtocol
         AbortFlag abort;
         QString message;
         
-        StimulusClampProtocolSimulator() : model(0), abort(false) {}
-        ~StimulusClampProtocolSimulator() { for(Epoch *epoch : uniqueEpochs) delete epoch; }
+        std::vector<double> x0; // Variable starting values.
+        std::vector<double> xmin; // Variable lower bounds.
+        std::vector<double> xmax; // Variable upper bounds.
+        gsl_multimin_fminimizer *minimizer;
+        gsl_vector *x; // Variables.
+        gsl_vector *dx; // Variable step sizes.
+        gsl_multimin_function func;
         
-        void init();
-        void run();
-    };
-    
-    /* --------------------------------------------------------------------------------
-     * -------------------------------------------------------------------------------- */
-    class StimulusClampProtocolSimulatorDialog : public QProgressDialog, public StimulusClampProtocolSimulator
-    {
-        Q_OBJECT
+        StimulusClampProtocolSimulator(const QString &labelText = "", QWidget *parent = 0);
+        ~StimulusClampProtocolSimulator();
         
-    public:
-        StimulusClampProtocolSimulatorDialog(const QString &labelText = "", QWidget *parent = 0);
+        // [min, max) bounded coordinates <==> [-pi/2, pi/2).
+        static double linear2angular(double val, double min, double max) { return asin(2 * (val - min) / (max - min) - 1); }
+        static double angular2linear(double theta, double min, double max) { return min + (max - min) * (sin(theta)+1) / 2; }
         
-        void simulate();
+    public slots:
+        void simulate(bool showProgressDialog = true);
+        void initSimulation();
+        void runSimulation();
+        
+        void optimize(size_t maxIterations, double tolerance = 0, bool showProgressDialog = true);
+        void initOptimization();
+        void runOptimization(size_t maxIterations, double tolerance = 0);
+        double cost();
         
     signals:
         void aborted();

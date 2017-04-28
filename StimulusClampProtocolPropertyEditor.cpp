@@ -23,11 +23,13 @@ namespace StimulusClampProtocol
         _stimuliEditor = new QObjectPropertyEditor::QObjectListPropertyEditor();
         _waveformsEditor = new QObjectPropertyEditor::QObjectListPropertyEditor();
         _summariesEditor = new QObjectPropertyEditor::QObjectListPropertyEditor();
+        _refDataEditor = new QObjectPropertyEditor::QObjectListPropertyEditor();
         
         _protocolEditor->setModel(&_protocolModel);
         _stimuliEditor->setModel(&_stimuliModel);
         _waveformsEditor->setModel(&_waveformsModel);
         _summariesEditor->setModel(&_summariesModel);
+        _refDataEditor->setModel(&_refDataModel);
         
         _protocolTab = new QWidget();
         {
@@ -40,11 +42,16 @@ namespace StimulusClampProtocol
             layout->addWidget(new QLabel("Notes"));
             layout->addWidget(_notesEditor);
         }
+        _stimuliTab = getTab(_stimuliEditor);
+        _waveformsTab = getTab(_waveformsEditor);
+        _summariesTab = getTab(_summariesEditor);
+        _refDataTab = getTab(_refDataEditor);
         
         addTab(_protocolTab, "Protocol");
-        addTab(getTab(_stimuliEditor), "Stimuli");
-        addTab(getTab(_waveformsEditor), "Waveforms");
-        addTab(getTab(_summariesEditor), "Summaries");
+        addTab(_stimuliTab, "Stimuli");
+        addTab(_waveformsTab, "Waveforms");
+        addTab(_summariesTab, "Summaries");
+        addTab(_refDataTab, "Ref Data");
         
         setProtocol(protocol);
     }
@@ -59,17 +66,20 @@ namespace StimulusClampProtocol
         _stimuliModel.setObjects(_protocol->findChildren<Stimulus*>(QString(), Qt::FindDirectChildrenOnly));
         _waveformsModel.setObjects(_protocol->findChildren<Waveform*>(QString(), Qt::FindDirectChildrenOnly));
         _summariesModel.setObjects(_protocol->findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly));
+        _refDataModel.setObjects(_protocol->findChildren<ReferenceData*>(QString(), Qt::FindDirectChildrenOnly));
         
         QList<QByteArray> protocolPropertyNames = QObjectPropertyEditor::getMetaObjectPropertyNames(StimulusClampProtocol::staticMetaObject);
         QList<QByteArray> stimulusPropertyNames = QObjectPropertyEditor::getMetaObjectPropertyNames(Stimulus::staticMetaObject);
         QList<QByteArray> waveformPropertyNames = QObjectPropertyEditor::getMetaObjectPropertyNames(Waveform::staticMetaObject);
         QList<QByteArray> summaryPropertyNames = QObjectPropertyEditor::getMetaObjectPropertyNames(SimulationsSummary::staticMetaObject);
+        QList<QByteArray> refDataPropertyNames = QObjectPropertyEditor::getMetaObjectPropertyNames(ReferenceData::staticMetaObject);
         
         protocolPropertyNames.removeOne("objectName");
         protocolPropertyNames.removeOne("Notes");
         stimulusPropertyNames.removeOne("objectName");
         waveformPropertyNames.removeOne("objectName");
         summaryPropertyNames.removeOne("objectName");
+        refDataPropertyNames.removeOne("objectName");
         
         QHash<QByteArray, QString> protocolPropertyHeaders;
         QHash<QByteArray, QString> stimulusPropertyHeaders;
@@ -91,6 +101,7 @@ namespace StimulusClampProtocol
         _stimuliModel.setPropertyNames(stimulusPropertyNames);
         _waveformsModel.setPropertyNames(waveformPropertyNames);
         _summariesModel.setPropertyNames(summaryPropertyNames);
+        _refDataModel.setPropertyNames(refDataPropertyNames);
         
         _protocolModel.setPropertyHeaders(protocolPropertyHeaders);
         _stimuliModel.setPropertyHeaders(stimulusPropertyHeaders);
@@ -99,14 +110,19 @@ namespace StimulusClampProtocol
         _stimuliModel.setParentOfObjects(_protocol);
         _waveformsModel.setParentOfObjects(_protocol);
         _summariesModel.setParentOfObjects(_protocol);
+        _refDataModel.setParentOfObjects(_protocol);
         
         _stimuliModel.setObjectCreator(_stimuliModel.defaultCreator<Stimulus>);
         _waveformsModel.setObjectCreator(_waveformsModel.defaultCreator<Waveform>);
         _summariesModel.setObjectCreator(_summariesModel.defaultCreator<SimulationsSummary>);
+        _refDataModel.setObjectCreator(_refDataModel.defaultCreator<ReferenceData>);
         
         _notesEditor->setPlainText(_protocol->notes());
         
         _stimuliEditor->resizeColumnsToContents();
+        _waveformsEditor->resizeColumnsToContents();
+        _summariesEditor->resizeColumnsToContents();
+        _refDataEditor->resizeColumnsToContents();
     }
     
     QWidget* StimulusClampProtocolPropertyEditor::getTab(QObjectPropertyEditor::QObjectListPropertyEditor *editor)

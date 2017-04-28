@@ -46,6 +46,8 @@ namespace StimulusClampProtocol
         void setPlotRows(int rows) { resizePlotGrid(rows, _plotColumns); }
         void setPlotColumns(int cols) { resizePlotGrid(_plotRows, cols); }
         void editProtocol();
+        void showMaxProbabilityError();
+        void showCost();
         
     signals:
         void plotGridResized();

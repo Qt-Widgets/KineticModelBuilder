@@ -631,11 +631,11 @@ namespace MarkovModel
         if(!file.open(QIODevice::Text | QIODevice::ReadOnly))
             return;
         QString buffer = file.readAll();
+        _fileInfo = QFileInfo(file);
+        file.close();
         QVariantMap data = QJsonDocument::fromJson(buffer.toUtf8()).toVariant().toMap();
         if(data.contains("MarkovModel::MarkovModel"))
             QObjectPropertyTreeSerializer::deserialize(this, data["MarkovModel::MarkovModel"].toMap(), &objectFactory);
-        _fileInfo = QFileInfo(file);
-        file.close();
     }
     
     void MarkovModel::save()

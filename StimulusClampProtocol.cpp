@@ -17,6 +17,7 @@
 #include <QFileDialog>
 #include <QFuture>
 #include <QJsonDocument>
+#include <QMessageBox>
 #include <QTextStream>
 #include <QTimer>
 #include <QVariantMap>
@@ -61,11 +62,12 @@ namespace StimulusClampProtocol
         }
     }
     
-    void findIndexesInRange(const Eigen::VectorXd &time, double start, double stop, int *firstPt, int *numPts)
+    void findIndexesInRange(const Eigen::VectorXd &time, double start, double stop, int *firstPt, int *numPts, double epsilon)
     {
         *firstPt = -1;
         *numPts = 0;
-        double epsilon = std::numeric_limits<double>::epsilon() * 5;
+        if(epsilon == 0)
+            epsilon = std::numeric_limits<double>::epsilon() * 5;
         Eigen::VectorXd::Index closestIndex;
         (time.array() - start).abs().minCoeff(&closestIndex);
         *firstPt = closestIndex;
@@ -80,12 +82,88 @@ namespace StimulusClampProtocol
         }
     }
     
+    void sampleArray(double *xref, double *yref, int nref, double *x, double *y, int n, int *firstPt, int *numPts, double x0, double epsilon)
+    {
+        // Set y values in y(x) based on yref(xref - x0).
+        // y(i) is lineraly interpolated between bounding yref(iref) and yref(iref + 1).
+        // firstPt and numPts designate the indices of y(x) that have associated reference data in yref(xref - x0).
+        // For example, if x = [10:20) and xref - x0 = [0:15), then firstPt = 0 and numPts = 5.
+        // For example, if x = [10:20) and xref - x0 = [15:25), then firstPt = 5 and numPts = 5.
+        // !!! WARNING !!! x and xref MUST be densely packed arrays that either increase or decrease monotonically.
+        // !!! However, x can increase whereas xref decreases, or vice versa. The decreasing arrays are simply iterated in reverse.
+        *firstPt = -1;
+        *numPts = 0;
+        if(epsilon == 0)
+            epsilon = std::numeric_limits<double>::epsilon() * 5;
+        double dx, dy;
+        double *xref0 = const_cast<double*>(xref);
+        bool isIncreasing = true;
+        bool isRefIncreasing = true;
+        if(n >= 2 && x[1] - x[0] < 0)
+            isIncreasing = false;
+        if(nref >= 2 && xref[1] - xref[0] < 0)
+            isRefIncreasing = false;
+        int i = (isIncreasing ? 0 : n - 1);
+        int iref = (isRefIncreasing ? 0 : nref - 1);
+        int di = (isIncreasing ? 1 : -1);
+        int diref = (isRefIncreasing ? 1 : -1);
+        bool hasShiftedData = false;
+        if(x0 != 0) {
+            xref0 = new double[nref];
+            hasShiftedData = true;
+            xref0[iref] = xref[iref] - x0;
+        }
+        while(i >= 0 && i < n && iref + diref >= 0 && iref + diref < nref) {
+            if(hasShiftedData)
+                xref0[iref + diref] = xref[iref + diref] - x0;
+            if(x[i] < xref0[iref] - epsilon) {
+                // Zero sample points before start of reference data.
+                y[i] = 0;
+                i += di;
+            } else if(x[i] <= xref0[iref + diref] + epsilon) {
+                if(fabs(x[i] - xref0[iref]) < epsilon) {
+                    y[i] = yref[iref];
+                } else if(fabs(x[i] - xref0[iref + diref]) < epsilon) {
+                    y[i] = yref[iref + diref];
+                } else {
+                    // Interpolate (linear) our current sample point using the two encompassing reference data points.
+                    // Then go to the next sample point.
+                    dx = xref[iref + diref] - xref[iref];
+                    dy = yref[iref + diref] - yref[iref];
+                    y[i] = yref[iref] + (dy / dx) * (x[i] - xref0[iref]);
+                }
+                if(*firstPt == -1)
+                    *firstPt = i;
+                i += di;
+            } else {
+                // Increase reference data counter until our reference data points surround our current sample point.
+                iref += diref;
+            }
+        }
+        if(*firstPt != -1) {
+            if(isIncreasing) {
+                *numPts = i - *firstPt;
+            } else {
+                *numPts = *firstPt - i;
+                *firstPt = i + 1;
+            }
+        }
+        while(i >= 0 && i < n) {
+            // Zero sample points after end of reference data.
+            y[i] = 0;
+            i += di;
+        }
+        if(hasShiftedData)
+            delete [] xref0;
+    }
+    
     QObjectPropertyTreeSerializer::ObjectFactory getObjectFactory()
     {
         QObjectPropertyTreeSerializer::ObjectFactory factory;
         factory.registerCreator("StimulusClampProtocol::Stimulus", factory.defaultCreator<Stimulus>);
         factory.registerCreator("StimulusClampProtocol::Waveform", factory.defaultCreator<Waveform>);
         factory.registerCreator("StimulusClampProtocol::SimulationsSummary", factory.defaultCreator<SimulationsSummary>);
+        factory.registerCreator("StimulusClampProtocol::ReferenceData", factory.defaultCreator<ReferenceData>);
         factory.registerCreator("StimulusClampProtocol::StimulusClampProtocol", factory.defaultCreator<StimulusClampProtocol>);
         return factory;
     }
@@ -379,6 +457,79 @@ namespace StimulusClampProtocol
         return maxError;
     }
     
+    QString ReferenceData::filePathRelativeToParentProtocol() const
+    {
+        if(StimulusClampProtocol *protocol = qobject_cast<StimulusClampProtocol*>(parent())) {
+            return protocol->fileInfo().absoluteDir().relativeFilePath(filePath());
+        }
+        return filePath();
+    }
+    
+    void ReferenceData::open(QString filePath)
+    {
+        if(filePath.isEmpty()) {
+            filePath = QFileDialog::getOpenFileName(0, "Open reference data file...");
+            if(filePath.isEmpty()) return;
+        }
+        QFileInfo fileInfo(filePath);
+        StimulusClampProtocol *protocol = qobject_cast<StimulusClampProtocol*>(parent());
+        if(fileInfo.isRelative() && protocol)
+            filePath = protocol->fileInfo().absoluteDir().filePath(filePath);
+        QFile file(filePath);
+        if(!file.open(QIODevice::Text | QIODevice::ReadOnly)) {
+            QMessageBox::information(0, "error", file.errorString() + ": " + filePath);
+            return;
+        }
+        QTextStream in(&file);
+        QString firstLine = in.readLine();
+        QStringList colTitles = firstLine.split("\t", QString::SkipEmptyParts);
+        int numColumns = colTitles.size();
+        std::vector<std::vector<double> > colData;
+        colData.resize(numColumns);
+        for(int col = 0; col < numColumns; ++col)
+            colData[col].reserve(10000);
+        bool ok;
+        while(!in.atEnd()) {
+            QString line = in.readLine();
+            QStringList fields = line.split(QRegExp("[ \t]"), QString::SkipEmptyParts);
+            for(int col = 0; col < numColumns; ++col) {
+                colData[col].push_back(col < fields.size() ? fields[col].toDouble(&ok) : 0);
+                if(!ok) {
+                    file.close();
+                    QMessageBox::information(0, "error", "Non-numeric data '" + fields[col] + "'.");
+                    return;
+                }
+            }
+        }
+        _fileInfo = QFileInfo(file);
+        file.close();
+        columnTitles = colTitles;
+        columnData.resize(numColumns);
+        for(int col = 0; col < numColumns; ++col) {
+            int numRows = colData[col].size();
+            columnData[col] = Eigen::VectorXd::Zero(numRows);
+            for(int row = 0; row < numRows; ++row)
+                columnData[col][row] = colData[col][row];
+        }
+        updateColumnPairsXY();
+    }
+    
+    void ReferenceData::updateColumnPairsXY()
+    {
+        // Parse y(x) column pairs based on column titles.
+        // Columns are either XYY... or XYXY...
+        columnPairsXY.clear();
+        if(columnData.size() == 0)
+            return;
+        if((columnData.size() % 2 == 0) && (columnTitles.size() > 2) && columnTitles[0] == columnTitles[2]) {
+            for(int i = 0; i + 1 < int(columnData.size()); i += 2)
+                columnPairsXY.push_back(std::pair<int, int>(i, i + 1));
+        } else {
+            for(int i = 1; i < int(columnData.size()); ++i)
+                columnPairsXY.push_back(std::pair<int, int>(0, i));
+        }
+    }
+    
     StimulusClampProtocol::StimulusClampProtocol(QObject *parent, const QString &name) :
     QObject(parent),
     _start("0"),
@@ -390,8 +541,9 @@ namespace StimulusClampProtocol
         setName(name);
     }
     
-    void StimulusClampProtocol::init(std::vector<Epoch*> &uniqueEpochs)
+    void StimulusClampProtocol::init(std::vector<Epoch*> &uniqueEpochs, const QStringList &stateNames)
     {
+        this->stateNames = stateNames;
         QList<Stimulus*> stimuli = findChildren<Stimulus*>(QString(), Qt::FindDirectChildrenOnly);
         QList<SimulationsSummary*> summaries = findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly);
         
@@ -538,15 +690,181 @@ namespace StimulusClampProtocol
                         summary->numPtsY(row, col) = numPts;
                     }
                 }
+                // Clear reference data.
+                sim.referenceData.clear();
             } // col
         } // row
+        // Reference data.
+        QStringList summaryNames;
+        foreach(SimulationsSummary *summary, summaries) {
+            summaryNames.push_back(summary->name());
+            summary->referenceData.clear();
+        }
+        foreach(ReferenceData *referenceData, findChildren<ReferenceData*>(QString(), Qt::FindDirectChildrenOnly)) {
+            if(!summaryNames.contains(referenceData->name())) {
+                size_t varSet = referenceData->variableSetIndex();
+                size_t row = referenceData->rowIndex();
+                size_t firstCol = referenceData->columnIndex();
+                if(row < rows) {
+                    for(size_t i = 0; i < referenceData->columnPairsXY.size() && firstCol + i < cols; ++i) {
+                        size_t col = firstCol + i;
+                        Simulation &sim = simulations[row][col];
+                        if(sim.referenceData.size() <= varSet)
+                            sim.referenceData.resize(varSet + 1);
+                        Simulation::RefData refData;
+                        refData.waveform = Eigen::VectorXd::Zero(sim.time.size());
+                        int columnX = referenceData->columnPairsXY[i].first;
+                        int columnY = referenceData->columnPairsXY[i].second;
+                        Eigen::VectorXd &refX = referenceData->columnData[columnX];
+                        Eigen::VectorXd &refY = referenceData->columnData[columnY];
+                        double *xref = refX.data();
+                        double *yref = refY.data();
+                        int nref = refY.size();
+                        double *x = sim.time.data();
+                        double *y = refData.waveform.data();
+                        int n = sim.time.size();
+                        double epsilon = (sim.time.segment(1, n - 1) - sim.time.segment(0, n - 1)).minCoeff() * 1e-5;
+                        double epsilonRef = (refX.segment(1, nref - 1) - refX.segment(0, nref - 1)).minCoeff() * 1e-5;
+                        if(epsilonRef < epsilon)
+                            epsilon = epsilonRef;
+                        sampleArray(xref, yref, nref, x, y, n, &refData.firstPt, &refData.numPts, referenceData->x0(), epsilon);
+                        if(refData.numPts > 0) {
+                            refData.waveform = refData.waveform.segment(refData.firstPt, refData.numPts);
+                            if(referenceData->normalization() == ReferenceData::ToMax) {
+                                refData.waveform /= refData.waveform.maxCoeff();
+                            } else if(referenceData->normalization() == ReferenceData::ToMin) {
+                                refData.waveform /= refData.waveform.minCoeff();
+                            } else if(referenceData->normalization() == ReferenceData::ToAbsMinMax) {
+                                double min = refData.waveform.minCoeff();
+                                double max = refData.waveform.maxCoeff();
+                                double peak = (fabs(max) >= fabs(min) ? max : min);
+                                refData.waveform /= peak;
+                            }
+                            if(referenceData->scale() != 1)
+                                refData.waveform *= referenceData->scale();
+                            refData.weight = referenceData->weight();
+                            sim.referenceData.at(varSet)[referenceData->name()] = refData;
+                        }
+                    } // i
+                }
+            }
+        } // referenceData
     }
     
     double StimulusClampProtocol::cost()
     {
         double cost = 0;
-        // ... TODO
+        for(size_t row = 0; row < simulations.size(); ++row) {
+            for(size_t col = 0; col < simulations[row].size(); ++col) {
+                Simulation &sim = simulations[row][col];
+                double simCost = 0;
+                for(size_t variableSetIndex = 0; variableSetIndex < sim.referenceData.size(); ++variableSetIndex) {
+                    for(auto &kv : sim.referenceData.at(variableSetIndex)) {
+                        Simulation::RefData &refData = kv.second;
+                        if(refData.numPts > 0) {
+                            double *x = 0;
+                            double *y = 0;
+                            int n;
+                            getSimulationWaveform(kv.first, sim, variableSetIndex, &x, &y, &n);
+                            if(x && y && n > 0) {
+                                Eigen::Map<Eigen::VectorXd> data(y + refData.firstPt, refData.numPts);
+                                Eigen::Map<Eigen::VectorXd> weight(sim.weight.data() + refData.firstPt, refData.numPts);
+                                simCost += ((data - refData.waveform).array().pow(2) * weight.array()).sum() * refData.weight;
+                            }
+                        }
+                    }
+                }
+                simCost *= weights[row][col];
+                cost += simCost;
+            }
+        }
+        foreach(SimulationsSummary *summary, findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly)) {
+            if(summary->isActive()) {
+                for(size_t variableSetIndex = 0; variableSetIndex < summary->referenceData.size(); ++variableSetIndex) {
+                    for(size_t row = 0; row < summary->referenceData.at(variableSetIndex).size(); ++row) {
+                        SimulationsSummary::RefData &refData = summary->referenceData.at(variableSetIndex).at(row);
+                        if(refData.numPts > 0) {
+                            SimulationsSummary::RowMajorMatrixXd &dataY = summary->dataY.at(variableSetIndex);
+                            Eigen::Map<Eigen::VectorXd> data(dataY.row(row).data() + refData.firstPt, refData.numPts);
+                            cost += ((data - refData.waveform).array().pow(2)).sum() * refData.weight;
+                        }
+                    }
+                }
+            }
+        }
         return cost;
+    }
+    
+    void StimulusClampProtocol::getSimulationWaveform(const QString &name, Simulation &sim, size_t variableSetIndex, double **x, double **y, int *n)
+    {
+        int stateIndex = stateNames.indexOf(name);
+        if(stateIndex != -1) {
+            if(sim.probability.size() > variableSetIndex) {
+                *x = sim.time.data();
+                *y = sim.probability.at(variableSetIndex).col(stateIndex).data();
+                *n = sim.time.size();
+            }
+            return;
+        }
+        std::map<QString, Eigen::VectorXd>::iterator stimulusIter = sim.stimuli.find(name);
+        if(stimulusIter != sim.stimuli.end()) {
+            *x = sim.time.data();
+            *y = stimulusIter->second.data();
+            *n = sim.time.size();
+            return;
+        }
+        if(sim.waveforms.size() > variableSetIndex) {
+            std::map<QString, Eigen::VectorXd>::iterator waveformIter = sim.waveforms.at(variableSetIndex).find(name);
+            if(waveformIter != sim.waveforms.at(variableSetIndex).end()) {
+                *x = sim.time.data();
+                *y = waveformIter->second.data();
+                *n = sim.time.size();
+                return;
+            }
+        }
+    }
+    
+    void StimulusClampProtocol::getSimulationRefWaveform(const QString &name, Simulation &sim, size_t variableSetIndex, double **x, double **y, int *n)
+    {
+        if(sim.referenceData.size() > variableSetIndex) {
+            std::map<QString, Simulation::RefData>::iterator refIter = sim.referenceData.at(variableSetIndex).find(name);
+            if(refIter != sim.referenceData.at(variableSetIndex).end()) {
+                Simulation::RefData &refData = refIter->second;
+                *x = sim.time.data() + refData.firstPt;
+                *y = refData.waveform.data();
+                *n = refData.numPts;
+                return;
+            }
+        }
+    }
+    
+    void StimulusClampProtocol::getSummaryWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n)
+    {
+        foreach(SimulationsSummary *summary, findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly)) {
+            if(summary->isActive() && summary->name() == name) {
+                if(summary->dataX.size() > variableSetIndex && summary->dataY.size() > variableSetIndex) {
+                    *x = summary->dataX.at(variableSetIndex).row(row).data();
+                    *y = summary->dataY.at(variableSetIndex).row(row).data();
+                    *n = summary->dataY.at(variableSetIndex).cols();
+                }
+                return;
+            }
+        }
+    }
+    
+    void StimulusClampProtocol::getSummaryRefWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n)
+    {
+        foreach(SimulationsSummary *summary, findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly)) {
+            if(summary->isActive() && summary->name() == name) {
+                if(summary->referenceData.size() > variableSetIndex && summary->referenceData.at(variableSetIndex).size() > row) {
+                    SimulationsSummary::RefData &refData = summary->referenceData.at(variableSetIndex).at(row);
+                    *x = summary->dataX.at(variableSetIndex).row(row).data() + refData.firstPt;
+                    *y = refData.waveform.data();
+                    *n = refData.numPts;
+                }
+                return;
+            }
+        }
     }
     
 #ifdef DEBUG
@@ -573,11 +891,11 @@ namespace StimulusClampProtocol
         if(!file.open(QIODevice::Text | QIODevice::ReadOnly))
             return;
         QString buffer = file.readAll();
+        _fileInfo = QFileInfo(file);
+        file.close();
         QVariantMap data = QJsonDocument::fromJson(buffer.toUtf8()).toVariant().toMap();
         if(data.contains("StimulusClampProtocol::StimulusClampProtocol"))
             QObjectPropertyTreeSerializer::deserialize(this, data["StimulusClampProtocol::StimulusClampProtocol"].toMap(), &objectFactory);
-        _fileInfo = QFileInfo(file);
-        file.close();
     }
     
     void StimulusClampProtocol::save()
@@ -640,25 +958,61 @@ namespace StimulusClampProtocol
         }
     }
     
-    void StimulusClampProtocolSimulator::init()
+    StimulusClampProtocolSimulator::StimulusClampProtocolSimulator(const QString &labelText, QWidget *parent) :
+    QProgressDialog(labelText, "Abort", 0, 0, parent),
+    model(0),
+    abort(false),
+    minimizer(0),
+    x(0),
+    dx(0)
+    {
+        connect(this, SIGNAL(canceled()), this, SLOT(_abort()));
+        connect(&_watcher, SIGNAL(finished()), this, SLOT(_finish()));
+    }
+    
+    StimulusClampProtocolSimulator::~StimulusClampProtocolSimulator()
+    {
+        for(Epoch *epoch : uniqueEpochs) delete epoch;
+        if(minimizer) gsl_multimin_fminimizer_free(minimizer);
+        if(x) gsl_vector_free(x);
+        if(dx) gsl_vector_free(dx);
+    }
+    
+    void StimulusClampProtocolSimulator::simulate(bool showProgressDialog)
+    {
+        setRange(0, 0); // Infinite wait progress bar.
+        if(showProgressDialog)
+            QTimer::singleShot(2000, this, SLOT(show())); // Show dialog after 2000 ms.
+        try {
+            initSimulation();
+            _future = QtConcurrent::run(static_cast<StimulusClampProtocolSimulator*>(this), &StimulusClampProtocolSimulator::runSimulation);
+            _watcher.setFuture(_future);
+        } catch(std::runtime_error &e) {
+            message = QString(e.what());
+            _finish();
+        } catch(...) {
+            message = "Undocumentded error.";
+            _finish();
+        }
+    }
+    
+    void StimulusClampProtocolSimulator::initSimulation()
     {
         model->init(stateNames);
         for(Epoch *epoch : uniqueEpochs)
             delete epoch;
         uniqueEpochs.clear();
-        foreach(StimulusClampProtocol *protocol, protocols) {
-            protocol->init(uniqueEpochs);
-            protocol->stateNames = stateNames;
-        }
+        foreach(StimulusClampProtocol *protocol, protocols)
+            protocol->init(uniqueEpochs, stateNames);
     }
     
-    void StimulusClampProtocolSimulator::run()
+    void StimulusClampProtocolSimulator::runSimulation()
     {
         try {
             QList<MarkovModel::StateGroup*> stateGroups = model->findChildren<MarkovModel::StateGroup*>(QString(), Qt::FindDirectChildrenOnly);
+            QString method = options["Method"].toString();
             std::vector<QFuture<void> > futures;
             for(size_t variableSetIndex = 0; variableSetIndex < model->numVariableSets(); ++variableSetIndex) {
-                QString method = options["Method"].toString();
                 // Unique epochs.
                 for(Epoch *epoch : uniqueEpochs) {
                     if(abort) break;
@@ -726,6 +1080,12 @@ namespace StimulusClampProtocol
                             SimulationsSummary::RowMajorMatrixXd &dataY = summary->dataY.at(variableSetIndex);
                             dataX = SimulationsSummary::RowMajorMatrixXd::Zero(rows, cols);
                             dataY = SimulationsSummary::RowMajorMatrixXd::Zero(rows, cols);
+                            if(summary->referenceData.size() < model->numVariableSets())
+                                summary->referenceData.resize(model->numVariableSets());
+                            if(summary->referenceData.at(variableSetIndex).size() < rows)
+                                summary->referenceData.at(variableSetIndex).resize(rows);
+                            for(size_t row = 0; row < rows; ++row)
+                                summary->referenceData.at(variableSetIndex).at(row).numPts = 0;
                         }
                     }
                     for(size_t row = 0; row < rows; ++row) {
@@ -849,7 +1209,7 @@ namespace StimulusClampProtocol
                             } // summary
                         } // col
                     } // row
-                    // Normalize summaries?
+                    // Summary normalization.
                     foreach(SimulationsSummary *summary, summaries) {
                         if(summary->isActive()) {
                             SimulationsSummary::RowMajorMatrixXd &dataY = summary->dataY.at(variableSetIndex);
@@ -863,6 +1223,57 @@ namespace StimulusClampProtocol
                     }
                 } // protocol
             } // variableSetIndex
+            // Summary reference data.
+            for(StimulusClampProtocol *protocol : protocols) {
+                size_t rows = protocol->simulations.size();
+                size_t cols = rows ? protocol->simulations[0].size() : 0;
+                foreach(ReferenceData *referenceData, protocol->findChildren<ReferenceData*>(QString(), Qt::FindDirectChildrenOnly)) {
+                    size_t varSet = referenceData->variableSetIndex();
+                    size_t firstRow = referenceData->rowIndex();
+                    foreach(SimulationsSummary *summary, protocol->findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly)) {
+                        if(summary->isActive() && summary->name() == referenceData->name()) {
+                            SimulationsSummary::RowMajorMatrixXd &dataX = summary->dataX.at(varSet);
+                            for(size_t i = 0; i < referenceData->columnPairsXY.size() && firstRow + i < rows; ++i) {
+                                size_t row = firstRow + i;
+                                SimulationsSummary::RefData &refData = summary->referenceData.at(varSet).at(row);
+                                refData.waveform = Eigen::RowVectorXd::Zero(cols);
+                                int columnX = referenceData->columnPairsXY[i].first;
+                                int columnY = referenceData->columnPairsXY[i].second;
+                                Eigen::VectorXd &refX = referenceData->columnData[columnX];
+                                Eigen::VectorXd &refY = referenceData->columnData[columnY];
+                                double *xref = refX.data();
+                                double *yref = refY.data();
+                                int nref = refY.size();
+                                double *x = dataX.row(row).data();
+                                double *y = refData.waveform.data();
+                                int n = cols;
+                                double epsilon = (dataX.row(row).segment(1, n - 1) - dataX.row(row).segment(0, n - 1)).minCoeff() * 1e-5;
+                                double epsilonRef = (refX.segment(1, nref - 1) - refX.segment(0, nref - 1)).minCoeff() * 1e-5;
+                                if(epsilonRef < epsilon)
+                                    epsilon = epsilonRef;
+                                sampleArray(xref, yref, nref, x, y, n, &refData.firstPt, &refData.numPts, referenceData->x0(), epsilon);
+                                if(refData.numPts > 0) {
+                                    refData.waveform = refData.waveform.segment(refData.firstPt, refData.numPts);
+                                    if(referenceData->normalization() == ReferenceData::ToMax) {
+                                        refData.waveform /= refData.waveform.maxCoeff();
+                                    } else if(referenceData->normalization() == ReferenceData::ToMin) {
+                                        refData.waveform /= refData.waveform.minCoeff();
+                                    } else if(referenceData->normalization() == ReferenceData::ToAbsMinMax) {
+                                        double min = refData.waveform.minCoeff();
+                                        double max = refData.waveform.maxCoeff();
+                                        double peak = (fabs(max) >= fabs(min) ? max : min);
+                                        refData.waveform /= peak;
+                                    }
+                                    if(referenceData->scale() != 1)
+                                        refData.waveform *= referenceData->scale();
+                                    refData.weight = referenceData->weight();
+                                }
+                            }
+                            break;
+                        }
+                    } // summary
+                } // referenceData
+            } // protocol
         } catch(std::runtime_error &e) {
             abort = true;
             message = QString(e.what());
@@ -874,21 +1285,14 @@ namespace StimulusClampProtocol
         }
     }
     
-    StimulusClampProtocolSimulatorDialog::StimulusClampProtocolSimulatorDialog(const QString &labelText, QWidget *parent) :
-    QProgressDialog(labelText, "Abort", 0, 0, parent),
-    StimulusClampProtocolSimulator()
+    void StimulusClampProtocolSimulator::optimize(size_t maxIterations, double tolerance, bool showProgressDialog)
     {
-        connect(this, SIGNAL(canceled()), this, SLOT(_abort()));
-        connect(&_watcher, SIGNAL(finished()), this, SLOT(_finish()));
-    }
-    
-    void StimulusClampProtocolSimulatorDialog::simulate()
-    {
-        setRange(0, 0); // Infinite wait progress bar.
-        QTimer::singleShot(2000, this, SLOT(show())); // Show dialog after 2000 ms.
+        setRange(0, maxIterations); // Infinite wait progress bar.
+        if(showProgressDialog)
+            QTimer::singleShot(2000, this, SLOT(show())); // Show dialog after 2000 ms.
         try {
-            init();
-            _future = QtConcurrent::run(static_cast<StimulusClampProtocolSimulator*>(this), &StimulusClampProtocolSimulator::run);
+            initOptimization();
+            _future = QtConcurrent::run(static_cast<StimulusClampProtocolSimulator*>(this), &StimulusClampProtocolSimulator::runOptimization, maxIterations, tolerance);
             _watcher.setFuture(_future);
         } catch(std::runtime_error &e) {
             message = QString(e.what());
@@ -899,7 +1303,65 @@ namespace StimulusClampProtocol
         }
     }
     
-    void StimulusClampProtocolSimulatorDialog::_abort()
+    double costFunctionForOptimizer(const gsl_vector *x, void *params)
+    {
+        StimulusClampProtocolSimulator *optimizer = static_cast<StimulusClampProtocolSimulator*>(params);
+        int n = x->size;
+        std::vector<double> vars(n);
+        for(int i = 0; i < n; ++i)
+            vars[i] = optimizer->angular2linear(gsl_vector_get(x, i), optimizer->xmin[i], optimizer->xmax[i]);
+        optimizer->model->setFreeVariables(vars);
+        optimizer->runSimulation();
+        return optimizer->cost();
+    }
+    
+    void StimulusClampProtocolSimulator::initOptimization()
+    {
+        initSimulation();
+        if(!model) return;
+        model->getFreeVariables(x0, xmin, xmax);
+        if(x0.size() == 0)
+            throw std::runtime_error("No variables to optimize.");
+        int n = x0.size();
+        x = gsl_vector_alloc(n);
+        dx = gsl_vector_alloc(n);
+        for(int i = 0; i < n; ++i) {
+            gsl_vector_set(x, i, linear2angular(x0[i], xmin[i], xmax[i]));
+            gsl_vector_set(dx, i, M_PI / 50);
+        }
+        minimizer = gsl_multimin_fminimizer_alloc(gsl_multimin_fminimizer_nmsimplex2, n);
+        func.n = n;
+        func.f = costFunctionForOptimizer;
+        func.params = this;
+        gsl_multimin_fminimizer_set(minimizer, &func, x, dx);
+    }
+    
+    void StimulusClampProtocolSimulator::runOptimization(size_t maxIterations, double tolerance)
+    {
+        for(size_t i = 0; i < maxIterations; ++i) {
+            setValue(i);
+            int status = gsl_multimin_fminimizer_iterate(minimizer);
+            if(status == 0) {
+                double size = gsl_multimin_fminimizer_size(minimizer);
+                status = gsl_multimin_test_size(size, tolerance);
+            }
+            if(status != GSL_CONTINUE || abort)
+                break;
+        }
+        // Apply minimized parameters by calling cost function.
+        (*(func.f))(minimizer->x, func.params);
+        setValue(maxIterations);
+    }
+    
+    double StimulusClampProtocolSimulator::cost()
+    {
+        double cost = 0;
+        for(StimulusClampProtocol *protocol : protocols)
+            cost += protocol->cost();
+        return cost;
+    }
+    
+    void StimulusClampProtocolSimulator::_abort()
     {
         abort = true;
         emit aborted();
@@ -909,8 +1371,8 @@ namespace StimulusClampProtocol
         QApplication::processEvents();
     }
     
-    void StimulusClampProtocolSimulatorDialog::_finish()
-    {  
+    void StimulusClampProtocolSimulator::_finish()
+    {
         emit finished();
         if(!message.isEmpty()) {
             show();

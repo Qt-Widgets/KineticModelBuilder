@@ -8,9 +8,11 @@
 #define __Project_H__
 
 #include "QObjectPropertyTreeSerializer.h"
+#include <QDir>
 #include <QFileInfo>
 #include <QObject>
 #include <QString>
+#include <QTime>
 #ifdef DEBUG
 #include <iostream>
 #include <QDebug>
@@ -92,18 +94,16 @@ namespace KineticModelBuilder
         bool _sampleProbabilityFromMonteCarloEventChains;
         int _numOptimizationIterations;
         bool _autoTileWindows;
-        
-        // File info.
         QFileInfo _fileInfo;
-        
-        // Busy indicator.
         int _busyLevel;
+        QTime _timer;
         
         // Creates a new Object and a UI for it.
         template <class Object, class UI>
         Object* _newObjectWithUI(const QVariantMap &data = QVariantMap())
         {
             Object *object = new Object(this);
+            object->setFileInfo(_fileInfo);
             if(!data.isEmpty()) {
                 object->clear();
                 QObjectPropertyTreeSerializer::deserialize(object, data, &Object::objectFactory);
