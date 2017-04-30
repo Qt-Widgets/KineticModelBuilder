@@ -125,29 +125,40 @@ namespace KineticModelBuilder
             if(QMainWindow *window = qobject_cast<QMainWindow*>(widget))
                 oldWindows.push_back(window);
         }
-        if(data.contains("MarkovModel::MarkovModel")) {
-            if(data["MarkovModel::MarkovModel"].type() == QVariant::List) {
-                foreach(const QVariant &node, data["MarkovModel::MarkovModel"].toList()) {
-                    if(node.type() == QVariant::Map) {
-                        _newObjectWithUI<MarkovModel::MarkovModel, MarkovModel::MarkovModelWindow>(node.toMap());
+        size_t numNewWindows = 0;
+        QVariantMap projectData;
+        foreach(const QString &key, data.keys()) {
+            if(key == "MarkovModel::MarkovModel") {
+                if(data[key].type() == QVariant::List) {
+                    foreach(const QVariant &node, data[key].toList()) {
+                        if(node.type() == QVariant::Map) {
+                            _newObjectWithUI<MarkovModel::MarkovModel, MarkovModel::MarkovModelWindow>(node.toMap());
+                            ++numNewWindows;
+                        }
                     }
+                } else if(data[key].type() == QVariant::Map) {
+                    _newObjectWithUI<MarkovModel::MarkovModel, MarkovModel::MarkovModelWindow>(data[key].toMap());
+                    ++numNewWindows;
                 }
-            } else if(data["MarkovModel::MarkovModel"].type() == QVariant::Map) {
-                _newObjectWithUI<MarkovModel::MarkovModel, MarkovModel::MarkovModelWindow>(data["MarkovModel::MarkovModel"].toMap());
+            } else if(key == "StimulusClampProtocol::StimulusClampProtocol") {
+                if(data[key].type() == QVariant::List) {
+                    foreach(const QVariant &node, data[key].toList()) {
+                        if(node.type() == QVariant::Map) {
+                            _newObjectWithUI<StimulusClampProtocol::StimulusClampProtocol, StimulusClampProtocol::StimulusClampProtocolWindow>(node.toMap());
+                            ++numNewWindows;
+                        }
+                    }
+                } else if(data[key].type() == QVariant::Map) {
+                    _newObjectWithUI<StimulusClampProtocol::StimulusClampProtocol, StimulusClampProtocol::StimulusClampProtocolWindow>(data[key].toMap());
+                    ++numNewWindows;
+                }
+            } else {
+                projectData[key] = data[key];
             }
         }
-        if(data.contains("StimulusClampProtocol::StimulusClampProtocol")) {
-            if(data["StimulusClampProtocol::StimulusClampProtocol"].type() == QVariant::List) {
-                foreach(const QVariant &node, data["StimulusClampProtocol::StimulusClampProtocol"].toList()) {
-                    if(node.type() == QVariant::Map) {
-                        _newObjectWithUI<StimulusClampProtocol::StimulusClampProtocol, StimulusClampProtocol::StimulusClampProtocolWindow>(node.toMap());
-                    }
-                }
-            } else if(data["StimulusClampProtocol::StimulusClampProtocol"].type() == QVariant::Map) {
-                _newObjectWithUI<StimulusClampProtocol::StimulusClampProtocol, StimulusClampProtocol::StimulusClampProtocolWindow>(data["StimulusClampProtocol::StimulusClampProtocol"].toMap());
-            }
-        }
-        if(data.size() > 1) {
+        if(projectData.size())
+            QObjectPropertyTreeSerializer::deserialize(this, projectData);
+        if(numNewWindows > 1) {
             bool temp = _autoTileWindows;
             _autoTileWindows = false;
             qDeleteAll(oldWindows);
