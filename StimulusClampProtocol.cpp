@@ -1287,9 +1287,10 @@ namespace StimulusClampProtocol
     
     void StimulusClampProtocolSimulator::optimize(size_t maxIterations, double tolerance, bool showProgressDialog)
     {
-        setRange(0, maxIterations); // Infinite wait progress bar.
+        setRange(0, maxIterations); // Wait progress bar.
+        setValue(0);
         if(showProgressDialog)
-            QTimer::singleShot(2000, this, SLOT(show())); // Show dialog after 2000 ms.
+            show();
         try {
             initOptimization();
             _future = QtConcurrent::run(static_cast<StimulusClampProtocolSimulator*>(this), &StimulusClampProtocolSimulator::runOptimization, maxIterations, tolerance);
@@ -1339,7 +1340,8 @@ namespace StimulusClampProtocol
     void StimulusClampProtocolSimulator::runOptimization(size_t maxIterations, double tolerance)
     {
         for(size_t i = 0; i < maxIterations; ++i) {
-            setValue(i);
+            if(i % 2 == 0)
+                setValue(i);
             int status = gsl_multimin_fminimizer_iterate(minimizer);
             if(status == 0) {
                 double size = gsl_multimin_fminimizer_size(minimizer);
