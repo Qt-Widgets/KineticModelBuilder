@@ -277,7 +277,8 @@ namespace StimulusClampProtocol
                                                 }
                                                 addCurve(yAxis, "Time (s)", visSig, postfix, x, y, n, _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
                                             } else if(col == visCols.at(0)) {
-                                                _protocol->getSummaryWaveform(visSig, varSet, row, &x, &y, &n);
+                                                QString xTitle, yTitle;
+                                                _protocol->getSummaryWaveform(visSig, varSet, row, &x, &y, &n, &xTitle, &yTitle);
                                                 if(x && y && n > 0) {
                                                     if(_showReferenceData) {
                                                         double *xref = 0;
@@ -285,10 +286,10 @@ namespace StimulusClampProtocol
                                                         int nref = 0;
                                                         _protocol->getSummaryRefWaveform(visSig, varSet, row, &xref, &yref, &nref);
                                                         if(xref && yref && nref > 0) {
-                                                            addCurve(yAxis, "Time (s)", "Ref " + visSig, postfix, xref, yref, nref, _referenceDataColor, QwtPlotCurve::Lines);
+                                                            addCurve(yAxis, xTitle, "Ref " + visSig, postfix, xref, yref, nref, _referenceDataColor, QwtPlotCurve::Lines);
                                                         }
                                                     }
-                                                    addCurve(yAxis, "Time (s)", visSig, postfix, x, y, n, _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
+                                                    addCurve(yAxis, xTitle, visSig, postfix, x, y, n, _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
                                                 }
                                             }
                                         }

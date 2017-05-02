@@ -18,7 +18,7 @@
 #include <QDebug>
 #endif
 class QMenu;
-namespace MarkovModel { class MarkovModel; }
+namespace MarkovModel { class MarkovModel; class MarkovModelWindow; }
 namespace StimulusClampProtocol { class StimulusClampProtocol; }
 
 namespace KineticModelBuilder
@@ -46,7 +46,7 @@ namespace KineticModelBuilder
         // For dynamic object creation.
         static QObjectPropertyTreeSerializer::ObjectFactory objectFactory;
         
-        Project() : _simulationMethod(MonteCarlo), _numMonteCarloRuns(1000), _accumulateMonteCarloRuns(false), _sampleProbabilityFromMonteCarloEventChains(true), _numOptimizationIterations(100), _autoTileWindows(true), _busyLevel(0) {}
+        Project() : _simulationMethod(MonteCarlo), _numMonteCarloRuns(1000), _accumulateMonteCarloRuns(false), _sampleProbabilityFromMonteCarloEventChains(true), _numOptimizationIterations(100), _autoTileWindows(true), _isBusy(false), _modelWindow(0) {}
         
         // Property getters.
         static QString version() { return "4.2.0"; }
@@ -95,8 +95,9 @@ namespace KineticModelBuilder
         int _numOptimizationIterations;
         bool _autoTileWindows;
         QFileInfo _fileInfo;
-        int _busyLevel;
+        bool _isBusy;
         QTime _timer;
+        MarkovModel::MarkovModelWindow *_modelWindow;
         
         // Creates a new Object and a UI for it.
         template <class Object, class UI>

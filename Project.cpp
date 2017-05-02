@@ -23,6 +23,7 @@
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QTextStream>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace KineticModelBuilder
@@ -367,14 +368,14 @@ namespace KineticModelBuilder
     void Project::simulate(MarkovModel::MarkovModel *model)
     {
         // Make sure we're not currently busy.
-        if(_busyLevel > 0) return;
-        ++_busyLevel;
+        if(_isBusy) return;
+        _isBusy = true;
+        _timer.start();
         
         // Model.
-        if(!model) {
-            if(MarkovModel::MarkovModelWindow *modelWindow = qobject_cast<MarkovModel::MarkovModelWindow*>(QApplication::activeWindow()))
-                model = modelWindow->model();
-        }
+        _modelWindow = qobject_cast<MarkovModel::MarkovModelWindow*>(QApplication::activeWindow());
+        if(!model && _modelWindow)
+            model = _modelWindow->model();
         if(!model) {
             QErrorMessage errMsg;
             errMsg.showMessage("No model selected.");
@@ -383,7 +384,7 @@ namespace KineticModelBuilder
         }
         
         // StimulusClampProtocols.
-        StimulusClampProtocol::StimulusClampProtocolSimulator *stimulusClampProtocolSimulator = new StimulusClampProtocol::StimulusClampProtocolSimulator("Simulating " + model->name() + "...");
+        StimulusClampProtocol::StimulusClampProtocolSimulator *stimulusClampProtocolSimulator = new StimulusClampProtocol::StimulusClampProtocolSimulator("Simulating " + model->name() + "...", _modelWindow);
         foreach(QWidget *widget, QApplication::topLevelWidgets()) {
             if(StimulusClampProtocol::StimulusClampProtocolWindow *window = qobject_cast<StimulusClampProtocol::StimulusClampProtocolWindow*>(widget)) {
                 stimulusClampProtocolSimulator->protocols.push_back(window->protocol());
@@ -401,28 +402,25 @@ namespace KineticModelBuilder
                 stimulusClampProtocolSimulator->options["Accumulate Monte Carlo runs"] = _accumulateMonteCarloRuns;
                 stimulusClampProtocolSimulator->options["Sample probability from Monte Carlo event chains"] = _sampleProbabilityFromMonteCarloEventChains;
             }
-            ++_busyLevel;
             connect(stimulusClampProtocolSimulator, SIGNAL(finished()), this, SLOT(simulationFinished()));
-            _timer.start();
-            stimulusClampProtocolSimulator->simulate(); // Will delete itself when simulation is done.
+            stimulusClampProtocolSimulator->simulate();
         } else {
             delete stimulusClampProtocolSimulator;
+            _isBusy = false;
         }
-        
-        --_busyLevel;
     }
     
     void Project::optimize(MarkovModel::MarkovModel *model)
     {
         // Make sure we're not currently busy.
-        if(_busyLevel > 0) return;
-        ++_busyLevel;
+        if(_isBusy) return;
+        _isBusy = true;
+        _timer.start();
         
         // Model.
-        if(!model) {
-            if(MarkovModel::MarkovModelWindow *modelWindow = qobject_cast<MarkovModel::MarkovModelWindow*>(QApplication::activeWindow()))
-                model = modelWindow->model();
-        }
+        _modelWindow = qobject_cast<MarkovModel::MarkovModelWindow*>(QApplication::activeWindow());
+        if(!model && _modelWindow)
+            model = _modelWindow->model();
         if(!model) {
             QErrorMessage errMsg;
             errMsg.showMessage("No model selected.");
@@ -431,7 +429,7 @@ namespace KineticModelBuilder
         }
         
         // StimulusClampProtocols.
-        StimulusClampProtocol::StimulusClampProtocolSimulator *stimulusClampProtocolSimulator = new StimulusClampProtocol::StimulusClampProtocolSimulator("Simulating " + model->name() + "...");
+        StimulusClampProtocol::StimulusClampProtocolSimulator *stimulusClampProtocolSimulator = new StimulusClampProtocol::StimulusClampProtocolSimulator("Simulating " + model->name() + "...", _modelWindow);
         foreach(QWidget *widget, QApplication::topLevelWidgets()) {
             if(StimulusClampProtocol::StimulusClampProtocolWindow *window = qobject_cast<StimulusClampProtocol::StimulusClampProtocolWindow*>(widget)) {
                 stimulusClampProtocolSimulator->protocols.push_back(window->protocol());
@@ -449,25 +447,22 @@ namespace KineticModelBuilder
                 stimulusClampProtocolSimulator->options["Accumulate Monte Carlo runs"] = _accumulateMonteCarloRuns;
                 stimulusClampProtocolSimulator->options["Sample probability from Monte Carlo event chains"] = _sampleProbabilityFromMonteCarloEventChains;
             }
-            ++_busyLevel;
             connect(stimulusClampProtocolSimulator, SIGNAL(finished()), this, SLOT(simulationFinished()));
-            _timer.start();
             stimulusClampProtocolSimulator->optimize(_numOptimizationIterations); // Will delete itself when simulation is done.
         } else {
             delete stimulusClampProtocolSimulator;
+            _isBusy = false;
         }
-        
-        --_busyLevel;
     }
     
     void Project::simulationFinished()
     {
-        --_busyLevel;
-        if(_busyLevel == 0) {
-            if(MarkovModel::MarkovModelWindow *modelWindow = qobject_cast<MarkovModel::MarkovModelWindow*>(QApplication::activeWindow())) {
-                modelWindow->statusBar()->showMessage("Elapsed time: " + QString::number(_timer.elapsed() / 1000.0) + " sec");
-            }
+        if(_modelWindow) {
+            _modelWindow->repaint();
+            _modelWindow->statusBar()->showMessage("Elapsed time: " + QString::number(_timer.elapsed() / 1000.0) + " sec");
         }
+        _modelWindow = 0;
+        _isBusy = false;
     }
 
 } // KineticModelBuilder

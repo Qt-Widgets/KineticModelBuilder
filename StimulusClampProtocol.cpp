@@ -328,15 +328,23 @@ namespace StimulusClampProtocol
             QT = epochIter->uniqueEpoch->transitionRates.transpose();
             while(eventChainDuration < endTime) {
                 if(abort && *abort) return;
+//                double lifetime = 0;
                 // Check if stuck in state.
-                double kout = -epochIter->uniqueEpoch->transitionRates.coeff(event.state, event.state); // Net rate leaving state.
-                if(kout < epsilon) {
-                    event.duration = endTime - eventChainDuration; // Remaining time.
-                    eventChain.push_back(event);
-                    break;
-                }
+//                double kout = -epochIter->uniqueEpoch->transitionRates.coeff(event.state, event.state); // Net rate leaving state.
+//                while(kout < epsilon) {
+//                    lifetime = epochIter->start + epochIter->duration - eventChainDuration;
+//                    // Go to next epoch.
+//                    ++epochIter;
+//                    if(epochIter == epochs.end())
+//                        break;
+//                    eventChainDuration = epochIter->start;
+////                    event.duration = endTime - eventChainDuration; // Remaining time.
+////                    eventChain.push_back(event);
+////                    break;
+//                }
                 // Lifetime in state.
-                double lifetime = epochIter->uniqueEpoch->randomStateLifetimes[event.state](randomNumberGenerator);
+                double kout = -epochIter->uniqueEpoch->transitionRates.coeff(event.state, event.state); // Net rate leaving state.
+                double lifetime = kout < epsilon ? endTime : epochIter->uniqueEpoch->randomStateLifetimes[event.state](randomNumberGenerator);
                 bool epochChanged = false;
                 while(eventChainDuration + lifetime > epochIter->start + epochIter->duration) { // Event takes us to the next epoch.
                     // Truncate lifetime to end of epoch.
@@ -347,12 +355,12 @@ namespace StimulusClampProtocol
                         break;
                     // Check if stuck in state.
                     kout = -epochIter->uniqueEpoch->transitionRates.coeff(event.state, event.state); // Net rate leaving state.
-                    if(kout < epsilon) {
-                        epochIter = epochs.end();
-                        break;
-                    }
+//                    if(kout < epsilon) {
+//                        epochIter = epochs.end();
+//                        break;
+//                    }
                     // Lifetime extends into new epoch.
-                    lifetime += epochIter->uniqueEpoch->randomStateLifetimes[event.state](randomNumberGenerator);
+                    lifetime += kout < epsilon ? endTime : epochIter->uniqueEpoch->randomStateLifetimes[event.state](randomNumberGenerator);
                     epochChanged = true;
                 }
                 // Check if we reached the end of the chain's duration.
@@ -757,7 +765,6 @@ namespace StimulusClampProtocol
         for(size_t row = 0; row < simulations.size(); ++row) {
             for(size_t col = 0; col < simulations[row].size(); ++col) {
                 Simulation &sim = simulations[row][col];
-                double simCost = 0;
                 for(size_t variableSetIndex = 0; variableSetIndex < sim.referenceData.size(); ++variableSetIndex) {
                     for(auto &kv : sim.referenceData.at(variableSetIndex)) {
                         Simulation::RefData &refData = kv.second;
@@ -769,13 +776,11 @@ namespace StimulusClampProtocol
                             if(x && y && n > 0) {
                                 Eigen::Map<Eigen::VectorXd> data(y + refData.firstPt, refData.numPts);
                                 Eigen::Map<Eigen::VectorXd> weight(sim.weight.data() + refData.firstPt, refData.numPts);
-                                simCost += ((data - refData.waveform).array().pow(2) * weight.array()).sum() * refData.weight;
+                                cost += ((data - refData.waveform).array().pow(2) * weight.array()).sum() * refData.weight;
                             }
                         }
                     }
                 }
-                simCost *= weights[row][col];
-                cost += simCost;
             }
         }
         foreach(SimulationsSummary *summary, findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly)) {
@@ -785,7 +790,7 @@ namespace StimulusClampProtocol
                         SimulationsSummary::RefData &refData = summary->referenceData.at(variableSetIndex).at(row);
                         if(refData.numPts > 0) {
                             SimulationsSummary::RowMajorMatrixXd &dataY = summary->dataY.at(variableSetIndex);
-                            Eigen::Map<Eigen::VectorXd> data(dataY.row(row).data() + refData.firstPt, refData.numPts);
+                            Eigen::Map<Eigen::RowVectorXd> data(dataY.row(row).data() + refData.firstPt, refData.numPts);
                             cost += ((data - refData.waveform).array().pow(2)).sum() * refData.weight;
                         }
                     }
@@ -838,7 +843,7 @@ namespace StimulusClampProtocol
         }
     }
     
-    void StimulusClampProtocol::getSummaryWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n)
+    void StimulusClampProtocol::getSummaryWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n, QString *xExpr, QString *yExpr)
     {
         foreach(SimulationsSummary *summary, findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly)) {
             if(summary->isActive() && summary->name() == name) {
@@ -846,13 +851,15 @@ namespace StimulusClampProtocol
                     *x = summary->dataX.at(variableSetIndex).row(row).data();
                     *y = summary->dataY.at(variableSetIndex).row(row).data();
                     *n = summary->dataY.at(variableSetIndex).cols();
+                    if(xExpr) *xExpr = QString::fromStdString(summary->exprXs.at(row).at(0));
+                    if(yExpr) *yExpr = QString::fromStdString(summary->exprYs.at(row).at(0));
                 }
                 return;
             }
         }
     }
     
-    void StimulusClampProtocol::getSummaryRefWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n)
+    void StimulusClampProtocol::getSummaryRefWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n, QString *xExpr, QString *yExpr)
     {
         foreach(SimulationsSummary *summary, findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly)) {
             if(summary->isActive() && summary->name() == name) {
@@ -861,6 +868,8 @@ namespace StimulusClampProtocol
                     *x = summary->dataX.at(variableSetIndex).row(row).data() + refData.firstPt;
                     *y = refData.waveform.data();
                     *n = refData.numPts;
+                    if(xExpr) *xExpr = QString::fromStdString(summary->exprXs.at(row).at(0));
+                    if(yExpr) *yExpr = QString::fromStdString(summary->exprYs.at(row).at(0));
                 }
                 return;
             }
@@ -968,6 +977,8 @@ namespace StimulusClampProtocol
     {
         connect(this, SIGNAL(canceled()), this, SLOT(_abort()));
         connect(&_watcher, SIGNAL(finished()), this, SLOT(_finish()));
+        connect(this, SIGNAL(iterationChanged(int)), this, SLOT(_atIteration(int)));
+        setWindowModality(Qt::WindowModality::ApplicationModal);
     }
     
     StimulusClampProtocolSimulator::~StimulusClampProtocolSimulator()
@@ -1341,7 +1352,7 @@ namespace StimulusClampProtocol
     {
         for(size_t i = 0; i < maxIterations; ++i) {
             if(i % 2 == 0)
-                setValue(i);
+                emit iterationChanged(i);
             int status = gsl_multimin_fminimizer_iterate(minimizer);
             if(status == 0) {
                 double size = gsl_multimin_fminimizer_size(minimizer);
@@ -1352,7 +1363,7 @@ namespace StimulusClampProtocol
         }
         // Apply minimized parameters by calling cost function.
         (*(func.f))(minimizer->x, func.params);
-        setValue(maxIterations);
+        emit iterationChanged(maxIterations);
     }
     
     double StimulusClampProtocolSimulator::cost()
@@ -1382,6 +1393,7 @@ namespace StimulusClampProtocol
             errMsg.showMessage(message);
             errMsg.exec();
         }
+        close();
         deleteLater();
     }
     

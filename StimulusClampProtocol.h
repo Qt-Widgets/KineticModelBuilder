@@ -475,8 +475,8 @@ namespace StimulusClampProtocol
         // Access simulation arrays.
         void getSimulationWaveform(const QString &name, Simulation &sim, size_t variableSetIndex, double **x, double **y, int *n);
         void getSimulationRefWaveform(const QString &name, Simulation &sim, size_t variableSetIndex, double **x, double **y, int *n);
-        void getSummaryWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n);
-        void getSummaryRefWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n);
+        void getSummaryWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n, QString *xExpr = 0, QString *yExpr = 0);
+        void getSummaryRefWaveform(const QString &name, size_t variableSetIndex, size_t row, double **x, double **y, int *n, QString *xExpr = 0, QString *yExpr = 0);
         
 #ifdef DEBUG
         void dump(std::ostream &out = std::cout);
@@ -546,10 +546,12 @@ namespace StimulusClampProtocol
     signals:
         void aborted();
         void finished();
+        void iterationChanged(int);
         
     protected slots:
         void _abort();
         void _finish();
+        void _atIteration(int i) { setValue(i); }
         
     protected:
         QFuture<void> _future;
