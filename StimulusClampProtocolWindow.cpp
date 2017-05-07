@@ -199,10 +199,12 @@ namespace StimulusClampProtocol
         _visibleColumnsBoxAction->setVisible(cols > 1);
         checkIfWeNeedToShowTheEventChainUi();
         foreach(StimulusClampProtocolPlot *plot, _plots) {
+            plot->setDrawingEnabled(false);
             plot->setVisibleVariableSetIndexes(_visibleVariableSetsBox->text());
             plot->setVisibleRows(_visibleRowsBox->text());
             plot->setVisibleColumns(_visibleColumnsBox->text());
             plot->setVisibleEventChains(_visibleEventChainsBox->text());
+            plot->setDrawingEnabled(true);
             plot->plotProtocol();
         }
     }

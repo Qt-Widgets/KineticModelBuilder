@@ -87,6 +87,7 @@ namespace StimulusClampProtocol
         int lineWidth() { return _lineWidth; }
         int markerSize() { return _markerSize; }
         QColor referenceDataColor() { return _referenceDataColor; }
+        bool drawingEnabled() const { return _drawingEnabled; }
         
         // Property setters.
         void setProtocol(StimulusClampProtocol *protocol) { _protocol = protocol; }
@@ -104,6 +105,7 @@ namespace StimulusClampProtocol
         void setLineWidth(int w) { _lineWidth = w; emit optionsChanged(); }
         void setMarkerSize(int w) { _markerSize = w; emit optionsChanged(); }
         void setReferenceDataColor(QColor color) { _referenceDataColor = color; emit optionsChanged(); }
+        void setDrawingEnabled(bool b) { _drawingEnabled = b; }
         
         // Default minimum size hint is too big, so we'll redefine it here.
         QSize minimumSizeHint() const { return QSize(30, 30); }
@@ -148,6 +150,7 @@ namespace StimulusClampProtocol
         int _lineWidth;
         int _markerSize;
         QColor _referenceDataColor;
+        bool _drawingEnabled;
         
         StimulusClampProtocolPlotPicker _picker;
         QwtPlotZoomer _zoomer;

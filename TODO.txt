@@ -1,3 +1,4 @@
-- Model optimization.
-- StimulusClampProtocolPlot::exportVisibleToText()
 - Auto generate waveform for charge current.
+- Update EigenLab to handle scientific notation (i.e. "1.3e-6").
+- Look into increasing simulation time with successive long Monte Carlo simulations.
+- Change sample points so last point does not include the stop time so as to match stimuli definitions.

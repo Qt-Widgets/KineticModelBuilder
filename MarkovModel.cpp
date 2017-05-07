@@ -475,8 +475,8 @@ namespace MarkovModel
                     double factor11 = evalExpr(interaction->factor11());
                     double factorA1 = evalExpr(interaction->factorA1());
                     double factor1B = evalExpr(interaction->factor1B());
-                    if(factor11 < 0)
-                        throw std::runtime_error("Negative interaction factor: '" + interaction->factor11().toStdString() + "'");
+                    if(factor11 <= 0)
+                        throw std::runtime_error("Negative or zero interaction factor: '" + interaction->factor11().toStdString() + "'");
                     if(factorA1 < 0)
                         throw std::runtime_error("Negative interaction factor: '" + interaction->factorA1().toStdString() + "'");
                     if(factor1B < 0)

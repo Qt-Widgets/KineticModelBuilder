@@ -75,6 +75,7 @@ namespace StimulusClampProtocol
     _lineWidth(2),
     _markerSize(0),
     _referenceDataColor(128, 128, 128),
+    _drawingEnabled(true),
     _picker(qobject_cast<QwtPlotCanvas*>(canvas())),
     _zoomer(canvas())
     {
@@ -131,6 +132,7 @@ namespace StimulusClampProtocol
     
     void StimulusClampProtocolPlot::plotProtocol()
     {
+        if(!_drawingEnabled) return;
         clearPlot();
         if(!_protocol) return;
         int rows = _protocol->simulations.size();
@@ -169,6 +171,7 @@ namespace StimulusClampProtocol
 //        qDebug() << "visCols: " << QVector<size_t>::fromStdVector(visCols);
         QList<SimulationsSummary*> summaries = _protocol->findChildren<SimulationsSummary*>(QString(), Qt::FindDirectChildrenOnly);
         int colorIndex = 0;
+        int rowStartingColorIndex = 0;
         for(int yAxis : {QwtPlot::yLeft, QwtPlot::yRight}) {
             std::vector<std::string> &visSignals = yAxis == QwtPlot::yLeft ? visLeft : visRight;
             if(yAxis == QwtPlot::yRight && visSignals.empty()) {
@@ -179,6 +182,7 @@ namespace StimulusClampProtocol
             }
             for(size_t varSet : visVarSets) {
                 for(size_t row : visRows) {
+                    rowStartingColorIndex = colorIndex;
                     if(row < _protocol->simulations.size()) {
                         QString rowPostfix = " (";
                         if(sets > 1) rowPostfix += QString::number(varSet) + ",";
@@ -190,6 +194,7 @@ namespace StimulusClampProtocol
                         if(rowPostfix == " ()")
                             rowPostfix = "";
                         for(size_t col : visCols) {
+                            colorIndex = rowStartingColorIndex;
                             if(col < _protocol->simulations[row].size()) {
                                 Simulation &sim = _protocol->simulations[row][col];
                                 QString postfix = rowPostfix;
@@ -276,7 +281,7 @@ namespace StimulusClampProtocol
                                                     }
                                                 }
                                                 addCurve(yAxis, "Time (s)", visSig, postfix, x, y, n, _colorMap.at(colorIndex++ % _colorMap.size()), QwtPlotCurve::Lines);
-                                            } else if(col == visCols.at(0)) {
+                                            } else if(col == visCols.back()) {
                                                 QString xTitle, yTitle;
                                                 _protocol->getSummaryWaveform(visSig, varSet, row, &x, &y, &n, &xTitle, &yTitle);
                                                 if(x && y && n > 0) {

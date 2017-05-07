@@ -95,8 +95,6 @@ namespace StimulusClampProtocol
         *numPts = 0;
         if(epsilon == 0)
             epsilon = std::numeric_limits<double>::epsilon() * 5;
-        double dx, dy;
-        double *xref0 = const_cast<double*>(xref);
         bool isIncreasing = true;
         bool isRefIncreasing = true;
         if(n >= 2 && x[1] - x[0] < 0)
@@ -107,37 +105,30 @@ namespace StimulusClampProtocol
         int iref = (isRefIncreasing ? 0 : nref - 1);
         int di = (isIncreasing ? 1 : -1);
         int diref = (isRefIncreasing ? 1 : -1);
-        bool hasShiftedData = false;
-        if(x0 != 0) {
-            xref0 = new double[nref];
-            hasShiftedData = true;
-            xref0[iref] = xref[iref] - x0;
-        }
-        while(i >= 0 && i < n && iref + diref >= 0 && iref + diref < nref) {
-            if(hasShiftedData)
-                xref0[iref + diref] = xref[iref + diref] - x0;
-            if(x[i] < xref0[iref] - epsilon) {
-                // Zero sample points before start of reference data.
-                y[i] = 0;
+        while(i >= 0 && i < n && iref >= 0 && iref < nref) {
+            if(x[i] < xref[iref] - x0 - epsilon) {
+                // Ignore sample points before start of reference data.
+                //y[i] = 0;
                 i += di;
-            } else if(x[i] <= xref0[iref + diref] + epsilon) {
-                if(fabs(x[i] - xref0[iref]) < epsilon) {
-                    y[i] = yref[iref];
-                } else if(fabs(x[i] - xref0[iref + diref]) < epsilon) {
-                    y[i] = yref[iref + diref];
-                } else {
-                    // Interpolate (linear) our current sample point using the two encompassing reference data points.
-                    // Then go to the next sample point.
-                    dx = xref[iref + diref] - xref[iref];
-                    dy = yref[iref + diref] - yref[iref];
-                    y[i] = yref[iref] + (dy / dx) * (x[i] - xref0[iref]);
-                }
+            } else if(fabs(x[i] - (xref[iref] - x0)) < epsilon) {
+                y[i] = yref[iref];
                 if(*firstPt == -1)
                     *firstPt = i;
                 i += di;
-            } else {
-                // Increase reference data counter until our reference data points surround our current sample point.
                 iref += diref;
+            } else { // x[i] > xref[iref] - x0 + epsilon
+                int jref = iref + diref;
+                if(jref >= 0 && jref < nref && (xref[jref] - x0) > x[i]) {
+                    // Interpolate (linear) our current sample point using the two encompassing reference data points.
+                    // Then go to the next sample point.
+                    double dx = xref[jref] - xref[iref];
+                    double dy = yref[jref] - yref[iref];
+                    y[i] = yref[iref] + (dy / dx) * (x[i] - (xref[iref] - x0));
+                    if(*firstPt == -1)
+                        *firstPt = i;
+                    i += di;
+                }
+                iref = jref;
             }
         }
         if(*firstPt != -1) {
@@ -148,13 +139,66 @@ namespace StimulusClampProtocol
                 *firstPt = i + 1;
             }
         }
-        while(i >= 0 && i < n) {
-            // Zero sample points after end of reference data.
-            y[i] = 0;
-            i += di;
-        }
-        if(hasShiftedData)
-            delete [] xref0;
+//        double dx, dy;
+//        double *xref0 = const_cast<double*>(xref);
+//        bool isIncreasing = true;
+//        bool isRefIncreasing = true;
+//        if(n >= 2 && x[1] - x[0] < 0)
+//            isIncreasing = false;
+//        if(nref >= 2 && xref[1] - xref[0] < 0)
+//            isRefIncreasing = false;
+//        int i = (isIncreasing ? 0 : n - 1);
+//        int iref = (isRefIncreasing ? 0 : nref - 1);
+//        int di = (isIncreasing ? 1 : -1);
+//        int diref = (isRefIncreasing ? 1 : -1);
+//        bool hasShiftedData = false;
+//        if(x0 != 0) {
+//            xref0 = new double[nref];
+//            hasShiftedData = true;
+//            xref0[iref] = xref[iref] - x0;
+//        }
+//        while(i >= 0 && i < n && iref + diref >= 0 && iref + diref < nref) {
+//            if(hasShiftedData)
+//                xref0[iref + diref] = xref[iref + diref] - x0;
+//            if(x[i] < xref0[iref] - epsilon) {
+//                // Zero sample points before start of reference data.
+//                y[i] = 0;
+//                i += di;
+//            } else if(x[i] <= xref0[iref + diref] + epsilon) {
+//                if(fabs(x[i] - xref0[iref]) < epsilon) {
+//                    y[i] = yref[iref];
+//                } else if(fabs(x[i] - xref0[iref + diref]) < epsilon) {
+//                    y[i] = yref[iref + diref];
+//                } else {
+//                    // Interpolate (linear) our current sample point using the two encompassing reference data points.
+//                    // Then go to the next sample point.
+//                    dx = xref[iref + diref] - xref[iref];
+//                    dy = yref[iref + diref] - yref[iref];
+//                    y[i] = yref[iref] + (dy / dx) * (x[i] - xref0[iref]);
+//                }
+//                if(*firstPt == -1)
+//                    *firstPt = i;
+//                i += di;
+//            } else {
+//                // Increase reference data counter until our reference data points surround our current sample point.
+//                iref += diref;
+//            }
+//        }
+//        if(*firstPt != -1) {
+//            if(isIncreasing) {
+//                *numPts = i - *firstPt;
+//            } else {
+//                *numPts = *firstPt - i;
+//                *firstPt = i + 1;
+//            }
+//        }
+//        while(i >= 0 && i < n) {
+//            // Zero sample points after end of reference data.
+//            y[i] = 0;
+//            i += di;
+//        }
+//        if(hasShiftedData)
+//            delete [] xref0;
     }
     
     QObjectPropertyTreeSerializer::ObjectFactory getObjectFactory()
@@ -314,6 +358,7 @@ namespace StimulusClampProtocol
             size_t eventCounter = 0;
             MonteCarloEvent event;
             // Set starting state.
+            event.state = -1;
             double prnd = randomUniform(randomNumberGenerator); // [0, 1)
             double ptot = 0;
             for(int i = 0; i < numStates; ++i) {
@@ -322,6 +367,12 @@ namespace StimulusClampProtocol
                     event.state = i;
                     break;
                 }
+            }
+            if(event.state == -1) {
+                event.state = numStates - 1;
+//                if(message) *message = "Failed to set starting state.";
+//                if(abort) *abort = true;
+//                return;
             }
             double eventChainDuration = 0;
             std::vector<Epoch>::iterator epochIter = epochs.begin();
@@ -1138,13 +1189,13 @@ namespace StimulusClampProtocol
                                 parser.var(kv.first.toStdString()).setLocal(kv.second);
                             parser.var("t").setShared(sim.time);
                             for(auto &kv : sim.stimuli)
-                                parser.var(kv.first.toStdString()).setShared(kv.second);
+                                parser.var(kv.first.toStdString()).setShared(kv.second.data(), numPts, 1);
                             if(probability) {
                                 for(int i = 0; i < numStates; ++i)
                                     parser.var(stateNames.at(i).toStdString()).setShared(probability->col(i).data(), numPts, 1);
                             }
                             for(auto &kv : waveforms)
-                                parser.var(kv.first.toStdString()).setShared(kv.second);
+                                parser.var(kv.first.toStdString()).setShared(kv.second.data(), numPts, 1);
                             // State groups.
                             if(probability) {
                                 foreach(MarkovModel::StateGroup *stateGroup, stateGroups) {
@@ -1153,7 +1204,7 @@ namespace StimulusClampProtocol
                                         Eigen::VectorXd &waveform = waveforms.at(stateGroup->name());
                                         for(int stateIndex : stateGroup->stateIndexes)
                                             waveform += probability->col(stateIndex);
-                                        parser.var(stateGroup->name().toStdString()).setShared(waveform);
+                                        parser.var(stateGroup->name().toStdString()).setShared(waveform.data(), numPts, 1);
                                     }
                                 }
                             }
@@ -1165,7 +1216,7 @@ namespace StimulusClampProtocol
                                     if(result.matrix().rows() != numPts || result.matrix().cols() != 1)
                                         throw std::runtime_error("Invalid dimensions for waveform '" + waveform->expr().toStdString() + "'.");
                                     waveforms[waveform->name()] = result.matrix();
-                                    parser.var(waveform->name().toStdString()).setShared(waveforms.at(waveform->name()));
+                                    parser.var(waveform->name().toStdString()).setShared(waveforms.at(waveform->name()).data(), numPts, 1);
                                 }
                             }
                             // Summaries.
@@ -1246,6 +1297,7 @@ namespace StimulusClampProtocol
                             SimulationsSummary::RowMajorMatrixXd &dataX = summary->dataX.at(varSet);
                             for(size_t i = 0; i < referenceData->columnPairsXY.size() && firstRow + i < rows; ++i) {
                                 size_t row = firstRow + i;
+                                //qDebug() << "summary " << summary->name() << "ref data for row" << row;
                                 SimulationsSummary::RefData &refData = summary->referenceData.at(varSet).at(row);
                                 refData.waveform = Eigen::RowVectorXd::Zero(cols);
                                 int columnX = referenceData->columnPairsXY[i].first;
@@ -1258,11 +1310,16 @@ namespace StimulusClampProtocol
                                 double *x = dataX.row(row).data();
                                 double *y = refData.waveform.data();
                                 int n = cols;
-                                double epsilon = (dataX.row(row).segment(1, n - 1) - dataX.row(row).segment(0, n - 1)).minCoeff() * 1e-5;
-                                double epsilonRef = (refX.segment(1, nref - 1) - refX.segment(0, nref - 1)).minCoeff() * 1e-5;
+                                double epsilon = (dataX.row(row).segment(1, n - 1) - dataX.row(row).segment(0, n - 1)).array().abs().minCoeff() * 1e-5;
+                                double epsilonRef = (refX.segment(1, nref - 1) - refX.segment(0, nref - 1)).array().abs().minCoeff() * 1e-5;
                                 if(epsilonRef < epsilon)
                                     epsilon = epsilonRef;
+                                //std::cout << "refX: " << refX << std::endl;
+                                //std::cout << "refY: " << refY << std::endl;
+                                //std::cout << "datX: " << dataX.row(row) << std::endl;
                                 sampleArray(xref, yref, nref, x, y, n, &refData.firstPt, &refData.numPts, referenceData->x0(), epsilon);
+                                //std::cout << "datY: " << refData.waveform << std::endl;
+                                //qDebug() << "indexes: " << refData.firstPt << refData.numPts;
                                 if(refData.numPts > 0) {
                                     refData.waveform = refData.waveform.segment(refData.firstPt, refData.numPts);
                                     if(referenceData->normalization() == ReferenceData::ToMax) {
